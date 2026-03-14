@@ -720,11 +720,12 @@ def build_dashboard(df: pd.DataFrame) -> go.Figure:
 # 7. Export standalone tile PNGs
 # ===========================================================================
 def export_tile_screenshots(df: pd.DataFrame):
-    """Export Tile 1 and Tile 2 as standalone PNG screenshots using kaleido."""
+    """Export Tile 1, Tile 2, and Tile 3 as standalone PNG screenshots using kaleido."""
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
     tile1_path = os.path.join(SCREENSHOTS_DIR, "tile1_categorical.png")
     tile2_path = os.path.join(SCREENSHOTS_DIR, "tile2_temporal.png")
+    tile3_path = os.path.join(SCREENSHOTS_DIR, "tile3_drawdown.png")
 
     print("[INFO] Exporting Tile 1 screenshot ...")
     try:
@@ -742,6 +743,15 @@ def export_tile_screenshots(df: pd.DataFrame):
         print(f"[INFO] Tile 2 saved to {tile2_path}")
     except Exception as exc:
         print(f"[WARN] Could not export Tile 2 PNG: {exc}")
+        print("[WARN] Ensure kaleido is installed: pip install kaleido>=0.2.1")
+
+    print("[INFO] Exporting Tile 3 screenshot ...")
+    try:
+        fig_tile3 = build_drawdown_figure(df)
+        fig_tile3.write_image(tile3_path, width=1200, height=600, scale=2)
+        print(f"[INFO] Tile 3 saved to {tile3_path}")
+    except Exception as exc:
+        print(f"[WARN] Could not export Tile 3 PNG: {exc}")
         print("[WARN] Ensure kaleido is installed: pip install kaleido>=0.2.1")
 
 

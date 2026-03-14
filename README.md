@@ -821,3 +821,7 @@ The generated `dashboard/dashboard.html` is a **fully self-contained file** — 
 ### Tile 2 — Price History & Moving Averages (Temporal)
 
 ![Tile 2](screenshots/tile2_temporal.png)
+
+### Tile 3 — Drawdown Over Time
+
+![Tile 3](screenshots/tile3_drawdown.png)
