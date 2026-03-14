@@ -11,7 +11,7 @@
         airflow-fernet airflow-init airflow-up airflow-down airflow-logs \
         dbt-deps dbt-run dbt-test dbt-docs \
         pipeline-trigger pipeline-status \
-        lint test clean
+        dashboard lint test clean
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 SHELL        := /bin/bash
@@ -151,6 +151,11 @@ pipeline-status: ## Show the last 5 DAG runs
 	        airflow dags list-runs -d daily_market_pipeline --limit 5
 
 # ── Quality ───────────────────────────────────────────────────────────────────
+dashboard: ## Generate interactive Plotly dashboard → dashboard/dashboard.html
+	@pip install -q -r dashboard/requirements.txt
+	@python dashboard/generate_dashboard.py
+	@open dashboard/dashboard.html
+
 lint: ## Run flake8 and black check on Python source files
 	@echo "→ Running flake8..."
 	@flake8 airflow/src/ airflow/dags/ --max-line-length=120

@@ -70,3 +70,4 @@ build/
 
 # ── Local data ─────────────────────────────────────────────────────────────────
 /tmp/market_data/
+dashboard/dashboard.html
