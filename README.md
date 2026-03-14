@@ -1,6 +1,6 @@
 # Apple & Tesla Market Intelligence Pipeline
 
-> A production-grade daily batch data pipeline that ingests AAPL, TSLA, and SPY end-of-day market data from Alpha Vantage, archives raw API responses to Google Cloud Storage, converts them to columnar Parquet format, loads the data into BigQuery, and applies dbt SQL window functions to compute professional financial metrics — all orchestrated by Apache Airflow running in Docker and visualised in a Looker Studio dashboard. The pipeline is idempotent and weekend/holiday-safe: every run loads the full compact history (last 100 trading days), so triggering on a Saturday or a market holiday produces a clean, up-to-date dataset rather than an error.
+> A production-grade daily batch data pipeline that ingests AAPL, TSLA, and SPY end-of-day market data from Alpha Vantage, archives raw API responses to Google Cloud Storage, converts them to columnar Parquet format, loads the data into BigQuery, and applies dbt SQL window functions to compute professional financial metrics — all orchestrated by Apache Airflow running in Docker and visualised in an interactive Plotly dashboard. The pipeline is idempotent and weekend/holiday-safe: every run loads the full compact history (last 100 trading days), so triggering on a Saturday or a market holiday produces a clean, up-to-date dataset rather than an error.
 
 ---
 
@@ -73,11 +73,11 @@
           └──────────────────┬──────────────────────────────┘
                              │
           ┌──────────────────▼──────────────────────────────┐
-          │          Looker Studio Dashboard                 │
-          │  Tile 1: Price Trend + Moving Averages           │
-          │  Tile 2: Risk & Market Comparison                │
-          │  Tile 3: Cumulative Return Comparison            │
-          │  Tile 4: Drawdown                                │
+          │          Plotly Dashboard (dashboard.html)       │
+          │  KPI Table: Latest price, return, volatility     │
+          │  Tile 1: Performance Snapshot (categorical bar)  │
+          │  Tile 2: Price History & Moving Averages (line)  │
+          │  Tile 3: Drawdown Over Time (area chart)         │
           └──────────────────────────────────────────────────┘
 ```
 
@@ -104,7 +104,7 @@
 | dbt | 1.7 | Version-controlled SQL transformations; built-in test framework; lineage graph |
 | Terraform | >= 1.5 | Reproducible, version-controlled GCP infrastructure (bucket, dataset, IAM) |
 | Python | 3.11 | Pipeline logic; pandas for DataFrame operations; pyarrow for Parquet |
-| Looker Studio | Free | Native BigQuery connector; no infrastructure to manage; shareable dashboard URLs |
+| Plotly | 5.x | Open-source Python library; generates a fully self-contained interactive HTML file; no account or license required; shareable via email or any file host |
 
 ---
 
@@ -664,7 +664,7 @@ If the `{% test %}` wrapper is omitted, dbt cannot register the test and the `db
 
 **Date partitioning** (`TIME_PARTITIONING` on the `date` column, DAY granularity) means BigQuery maintains a separate physical file per calendar day. A query with `WHERE date >= '2025-01-01'` only reads the relevant day-partitions rather than the full table, reducing bytes scanned by over 90% for a year-old dataset.
 
-**Symbol clustering** co-locates rows for `AAPL`, `TSLA`, and `SPY` within each partition. A filter like `WHERE symbol = 'AAPL'` allows BigQuery to skip the other symbol blocks entirely within each partition. Combined, these two techniques ensure that a typical Looker Studio dashboard query (e.g. "AAPL data for the last 30 days") scans only ~1/90 of the full table.
+**Symbol clustering** co-locates rows for `AAPL`, `TSLA`, and `SPY` within each partition. A filter like `WHERE symbol = 'AAPL'` allows BigQuery to skip the other symbol blocks entirely within each partition. Combined, these two techniques ensure that a typical dashboard query (e.g. "AAPL data for the last 30 days") scans only ~1/90 of the full table.
 
 ### Security
 
