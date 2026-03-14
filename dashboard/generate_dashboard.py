@@ -1,8 +1,9 @@
 """
-generate_dashboard.py — Apple & Tesla Market Intelligence Dashboard
+generate_dashboard.py — Market Intelligence Dashboard (Apple-Inspired Design)
 
 Queries the mart_daily_metrics BigQuery table and produces a self-contained
 interactive Plotly HTML dashboard saved to dashboard/dashboard.html.
+Also exports PNG screenshots of the two primary tiles using kaleido.
 
 Usage:
     python dashboard/generate_dashboard.py
@@ -22,11 +23,12 @@ import datetime
 # ---------------------------------------------------------------------------
 # Resolve paths relative to *this* file so the script can be run from anywhere
 # ---------------------------------------------------------------------------
-SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-ENV_FILE     = os.path.join(PROJECT_ROOT, ".env")
-SA_FILE      = os.path.join(PROJECT_ROOT, "airflow", "credentials", "service_account.json")
-OUTPUT_HTML  = os.path.join(SCRIPT_DIR, "dashboard.html")
+SCRIPT_DIR       = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT     = os.path.dirname(SCRIPT_DIR)
+ENV_FILE         = os.path.join(PROJECT_ROOT, ".env")
+SA_FILE          = os.path.join(PROJECT_ROOT, "airflow", "credentials", "service_account.json")
+OUTPUT_HTML      = os.path.join(SCRIPT_DIR, "dashboard.html")
+SCREENSHOTS_DIR  = os.path.join(PROJECT_ROOT, "screenshots")
 
 # ---------------------------------------------------------------------------
 # Load .env before any GCP imports so env vars are set in time
@@ -71,32 +73,50 @@ print(f"[INFO] Target table: {FULL_TABLE}")
 # ---------------------------------------------------------------------------
 # Imports that depend on the env being ready
 # ---------------------------------------------------------------------------
-import pandas as pd                          # noqa: E402
-import plotly.graph_objects as go           # noqa: E402
-from plotly.subplots import make_subplots   # noqa: E402
-from google.cloud import bigquery           # noqa: E402
+import pandas as pd                         # noqa: E402
+import plotly.graph_objects as go          # noqa: E402
+import plotly.io as pio                    # noqa: E402
+from plotly.subplots import make_subplots  # noqa: E402
+from google.cloud import bigquery          # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Colour palette
+# Apple-inspired design system
 # ---------------------------------------------------------------------------
 COLOR = {
-    "AAPL":    "#00D4FF",              # cyan
-    "TSLA":    "#FF6B35",              # orange
-    "SPY":     "#7FFF00",              # chartreuse
-    "SMA20":   "rgba(255,255,255,0.5)",
-    "SMA50":   "rgba(255,200,0,0.7)",
-    "SMA200":  "rgba(255,100,100,0.7)",
-    "pos":     "#26A69A",              # teal-green for positive bars
-    "neg":     "#EF5350",              # red for negative bars
-    "bg":      "#0a0a0a",
-    "paper":   "#111111",
-    "text":    "#E0E0E0",
-    "grid":    "rgba(255,255,255,0.06)",
-    "border":  "rgba(255,255,255,0.12)",
+    "AAPL":       "#0071e3",                  # Apple blue
+    "TSLA":       "#e31937",                  # Tesla red
+    "SPY":        "#30d158",                  # Apple green
+    "AAPL_sma20": "rgba(0,113,227,0.35)",     # lighter AAPL for SMA20
+    "AAPL_sma50": "rgba(0,113,227,0.55)",     # mid AAPL for SMA50
+    "TSLA_sma20": "rgba(227,25,55,0.35)",
+    "TSLA_sma50": "rgba(227,25,55,0.55)",
+    "SPY_sma20":  "rgba(48,209,88,0.35)",
+    "SPY_sma50":  "rgba(48,209,88,0.55)",
+    "bg":         "#0a0a0a",
+    "paper":      "#000000",
+    "card":       "#111111",
+    "border":     "#2a2a2a",
+    "text":       "#f5f5f7",
+    "secondary":  "#86868b",
+    "pos":        "#30d158",                  # Apple green for positive values
+    "neg":        "#ff453a",                  # Apple red for negative values
+    "zero_line":  "rgba(255,255,255,0.15)",
 }
 
 SYMBOLS   = ["AAPL", "TSLA", "SPY"]
-FONT_FMLY = "Inter, Helvetica Neue, Arial, sans-serif"
+FONT_FMLY = '-apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif'
+
+# Axis style applied uniformly to all xy subplots
+AXIS_STYLE = dict(
+    gridcolor="#1a1a1a",
+    linecolor="#2a2a2a",
+    zerolinecolor="#2a2a2a",
+    tickfont=dict(color="#86868b", size=11, family=FONT_FMLY),
+    title_font=dict(color="#86868b", family=FONT_FMLY),
+    showgrid=True,
+    showline=True,
+    mirror=False,
+)
 
 
 # ===========================================================================
@@ -135,412 +155,598 @@ def fetch_data() -> pd.DataFrame:
         sys.exit(1)
 
     df["date"] = pd.to_datetime(df["date"])
-    print(f"[INFO] Fetched {len(df):,} rows  |  date range: {df['date'].min().date()} → {df['date'].max().date()}")
+    print(
+        f"[INFO] Fetched {len(df):,} rows  |  "
+        f"date range: {df['date'].min().date()} → {df['date'].max().date()}"
+    )
     return df
 
 
 # ===========================================================================
-# 2. Build summary stats table
+# 2. KPI summary table (row 1)
 # ===========================================================================
-def build_summary_table(df: pd.DataFrame) -> go.Table:
-    rows = []
+def build_kpi_table(df: pd.DataFrame) -> go.Table:
+    """Build a styled Plotly Table with latest KPIs for each symbol."""
+    symbols_out, prices, ret1d, retcum, vols, drawdowns = [], [], [], [], [], []
+
     for sym in SYMBOLS:
         s = df[df["symbol"] == sym].sort_values("date")
         if s.empty:
             continue
         last = s.iloc[-1]
-        rows.append(
-            {
-                "Symbol":          sym,
-                "Latest Price":    f"${last['adjusted_close']:.2f}",
-                "1-Day Return":    f"{last['daily_return']:+.2f}%" if pd.notna(last["daily_return"]) else "N/A",
-                "Cumul. Return":   f"{last['cumulative_return']:+.2f}%" if pd.notna(last["cumulative_return"]) else "N/A",
-                "Drawdown":        f"{last['drawdown']:.2f}%"           if pd.notna(last["drawdown"]) else "N/A",
-                "Volatility (20d)": f"{last['rolling_volatility_20d']:.2f}%" if pd.notna(last["rolling_volatility_20d"]) else "N/A",
-            }
-        )
 
-    if not rows:
-        return go.Table()
+        def fmt_pct(val, decimals=2):
+            if pd.isna(val):
+                return "N/A"
+            return f"{val:+.{decimals}f}%"
 
-    import itertools
-    keys   = list(rows[0].keys())
-    vals   = [[r[k] for r in rows] for k in keys]
+        symbols_out.append(sym)
+        prices.append(f"${last['adjusted_close']:.2f}" if pd.notna(last["adjusted_close"]) else "N/A")
+        ret1d.append(fmt_pct(last["daily_return"]))
+        retcum.append(fmt_pct(last["cumulative_return"]))
+        vols.append(f"{last['rolling_volatility_20d']:.2f}%" if pd.notna(last["rolling_volatility_20d"]) else "N/A")
+        drawdowns.append(fmt_pct(last["drawdown"]))
 
-    # Colour the symbol column
-    sym_colors = [COLOR.get(sym, COLOR["text"]) for sym in [r["Symbol"] for r in rows]]
-    cell_colors = [sym_colors] + [["rgba(30,30,30,0.9)"] * len(rows)] * (len(keys) - 1)
+    # Color cells: symbol column uses symbol color; return cells use green/red
+    def pct_color(val_str):
+        if val_str == "N/A":
+            return COLOR["secondary"]
+        return COLOR["pos"] if val_str.startswith("+") else COLOR["neg"]
+
+    sym_fill   = [COLOR[s] for s in symbols_out]
+    ret1d_fill = [pct_color(v) for v in ret1d]
+    cum_fill   = [pct_color(v) for v in retcum]
+    dd_fill    = [pct_color(v) for v in drawdowns]
+    neutral    = ["rgba(17,17,17,0.0)"] * len(symbols_out)
+
+    header_vals = ["<b>Symbol</b>", "<b>Latest Price</b>", "<b>1-Day Return</b>",
+                   "<b>Cumulative Return</b>", "<b>Volatility (20d)</b>", "<b>Drawdown</b>"]
+    cell_vals   = [symbols_out, prices, ret1d, retcum, vols, drawdowns]
+    cell_colors = [
+        sym_fill,     # symbol column — brand color background
+        neutral,
+        ret1d_fill,
+        cum_fill,
+        neutral,
+        dd_fill,
+    ]
+    cell_font_colors = [
+        [COLOR["text"]] * len(symbols_out),
+        [COLOR["text"]] * len(symbols_out),
+        [COLOR["text"]] * len(symbols_out),
+        [COLOR["text"]] * len(symbols_out),
+        [COLOR["secondary"]] * len(symbols_out),
+        [COLOR["text"]] * len(symbols_out),
+    ]
 
     return go.Table(
-        columnwidth=[80, 110, 110, 120, 100, 130],
+        columnwidth=[70, 110, 110, 140, 130, 100],
         header=dict(
-            values=[f"<b>{k}</b>" for k in keys],
-            fill_color="rgba(255,255,255,0.08)",
+            values=header_vals,
+            fill_color="rgba(42,42,42,0.6)",
             font=dict(color=COLOR["text"], size=12, family=FONT_FMLY),
             align="center",
             height=36,
             line_color=COLOR["border"],
         ),
         cells=dict(
-            values=vals,
+            values=cell_vals,
             fill_color=cell_colors,
-            font=dict(color=COLOR["text"], size=12, family=FONT_FMLY),
+            font=dict(color=cell_font_colors, size=13, family=FONT_FMLY),
             align="center",
-            height=32,
+            height=34,
             line_color=COLOR["border"],
         ),
     )
 
 
 # ===========================================================================
-# 3. Chart helpers
+# 3. Tile 1 — Categorical Distribution: Performance Snapshot by Symbol
 # ===========================================================================
-def _axis_style(title: str = "", show_grid: bool = True) -> dict:
-    return dict(
-        title=dict(text=title, font=dict(size=11, color="rgba(255,255,255,0.55)", family=FONT_FMLY)),
-        showgrid=show_grid,
-        gridcolor=COLOR["grid"],
-        gridwidth=1,
-        zeroline=False,
-        color="rgba(255,255,255,0.45)",
-        tickfont=dict(size=10, family=FONT_FMLY),
-        linecolor=COLOR["border"],
-        showline=True,
-        mirror=False,
+def build_tile1_figure(df: pd.DataFrame) -> go.Figure:
+    """
+    Standalone grouped bar chart for Tile 1.
+    Groups: Cumulative Return | Avg Daily Volatility | Current Drawdown
+    One bar per symbol per group.
+    """
+    metrics = {
+        "Cumulative Return (%)": [],
+        "Avg Daily Volatility":  [],
+        "Current Drawdown (%)":  [],
+    }
+
+    for sym in SYMBOLS:
+        s = df[df["symbol"] == sym].sort_values("date")
+        if s.empty:
+            metrics["Cumulative Return (%)"].append(0)
+            metrics["Avg Daily Volatility"].append(0)
+            metrics["Current Drawdown (%)"].append(0)
+            continue
+        last = s.iloc[-1]
+        metrics["Cumulative Return (%)"].append(
+            round(float(last["cumulative_return"]), 2) if pd.notna(last["cumulative_return"]) else 0
+        )
+        metrics["Avg Daily Volatility"].append(
+            round(float(s["rolling_volatility_20d"].dropna().mean()), 2)
+            if not s["rolling_volatility_20d"].dropna().empty else 0
+        )
+        metrics["Current Drawdown (%)"].append(
+            round(float(last["drawdown"]), 2) if pd.notna(last["drawdown"]) else 0
+        )
+
+    fig = go.Figure()
+
+    group_labels  = list(metrics.keys())
+    group_x       = group_labels
+
+    for sym in SYMBOLS:
+        idx = SYMBOLS.index(sym)
+        y_vals = [metrics[g][idx] for g in group_labels]
+        text_vals = [f"{v:+.2f}%" for v in y_vals]
+
+        fig.add_trace(go.Bar(
+            name=sym,
+            x=group_x,
+            y=y_vals,
+            marker=dict(
+                color=COLOR[sym],
+                opacity=0.85,
+                line=dict(color=COLOR[sym], width=1),
+            ),
+            text=text_vals,
+            textposition="outside",
+            textfont=dict(color=COLOR["text"], size=11, family=FONT_FMLY),
+            width=0.22,
+        ))
+
+    # Zero reference line
+    fig.add_shape(
+        type="line", x0=0, x1=1, xref="paper",
+        y0=0, y1=0, yref="y",
+        line=dict(color=COLOR["zero_line"], width=1, dash="dot"),
+    )
+
+    fig.update_layout(
+        barmode="group",
+        paper_bgcolor=COLOR["paper"],
+        plot_bgcolor=COLOR["bg"],
+        font=dict(family=FONT_FMLY, color=COLOR["text"]),
+        title=dict(
+            text=(
+                "Performance Snapshot by Symbol"
+                "<br><sup style='color:#86868b;font-size:13px'>"
+                "Comparative metrics across AAPL, TSLA, and SPY"
+                "</sup>"
+            ),
+            font=dict(size=20, color=COLOR["text"]),
+            x=0.05, xanchor="left",
+        ),
+        legend=dict(
+            bgcolor="rgba(17,17,17,0.8)",
+            bordercolor=COLOR["border"],
+            borderwidth=1,
+            font=dict(color=COLOR["text"], size=12, family=FONT_FMLY),
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="right", x=1,
+        ),
+        xaxis=dict(
+            **{k: v for k, v in AXIS_STYLE.items() if k != "showgrid"},
+            title="Metric",
+            showgrid=False,
+        ),
+        yaxis=dict(
+            **{k: v for k, v in AXIS_STYLE.items() if k != "zerolinecolor"},
+            title="Value (%)",
+            zeroline=True,
+            zerolinecolor=COLOR["zero_line"],
+            zerolinewidth=1,
+        ),
+        margin=dict(l=60, r=60, t=100, b=60),
+        hoverlabel=dict(
+            bgcolor="#1a1a1a",
+            bordercolor=COLOR["border"],
+            font=dict(color=COLOR["text"], family=FONT_FMLY),
+        ),
+        height=600,
+    )
+    return fig
+
+
+def add_tile1_traces(fig: go.Figure, df: pd.DataFrame, row: int):
+    """Add Tile 1 traces to the main dashboard figure."""
+    tile1 = build_tile1_figure(df)
+    for trace in tile1.data:
+        t = trace
+        t.showlegend = True
+        t.legendgroup = f"tile1_{t.name}"
+        fig.add_trace(t, row=row, col=1)
+
+    fig.add_shape(
+        type="line", x0=0, x1=1, xref="paper",
+        y0=0, y1=0, yref=f"y{row}",
+        line=dict(color=COLOR["zero_line"], width=1, dash="dot"),
     )
 
 
-def add_price_traces(fig, df: pd.DataFrame, row_map: dict):
-    """Chart 1: Adjusted close + SMA20/50/200, one subplot per symbol."""
+# ===========================================================================
+# 4. Tile 2 — Temporal Distribution: Price History & Moving Averages
+# ===========================================================================
+def build_tile2_figure(df: pd.DataFrame) -> go.Figure:
+    """
+    Standalone time-series chart for Tile 2.
+    Solid lines: adjusted_close per symbol.
+    Dashed lines: SMA20 per symbol (lighter shade of symbol color).
+    Dotted lines: SMA50 per symbol (mid shade of symbol color).
+    """
+    fig = go.Figure()
+
     for sym in SYMBOLS:
-        r   = row_map[sym]
-        s   = df[df["symbol"] == sym].sort_values("date")
-        col = COLOR[sym]
+        s = df[df["symbol"] == sym].sort_values("date")
+        if s.empty:
+            continue
 
-        # Adjusted close
-        fig.add_trace(
-            go.Scatter(
-                x=s["date"], y=s["adjusted_close"],
-                name=f"{sym}",
-                line=dict(color=col, width=2),
-                legendgroup=sym,
-                showlegend=True,
+        col      = COLOR[sym]
+        col_s20  = COLOR.get(f"{sym}_sma20", col)
+        col_s50  = COLOR.get(f"{sym}_sma50", col)
+
+        # Adjusted close — solid, full color
+        fig.add_trace(go.Scatter(
+            x=s["date"],
+            y=s["adjusted_close"],
+            name=sym,
+            legendgroup=sym,
+            mode="lines",
+            line=dict(color=col, width=2),
+            hovertemplate=(
+                f"<b>{sym}</b><br>"
+                "Date: %{x|%b %d, %Y}<br>"
+                "Price: $%{y:.2f}<extra></extra>"
             ),
-            row=r, col=1,
-        )
-        # SMA20
-        fig.add_trace(
-            go.Scatter(
-                x=s["date"], y=s["sma_20"],
-                name="SMA 20" if sym == "AAPL" else None,
-                line=dict(color=COLOR["SMA20"], width=1, dash="dot"),
-                legendgroup="SMA20",
-                showlegend=(sym == "AAPL"),
+        ))
+
+        # SMA 20 — dashed, lighter shade
+        s_sma20 = s.dropna(subset=["sma_20"])
+        fig.add_trace(go.Scatter(
+            x=s_sma20["date"],
+            y=s_sma20["sma_20"],
+            name=f"{sym} SMA20",
+            legendgroup=f"{sym}_sma",
+            legendgrouptitle=dict(text="") if sym == "AAPL" else None,
+            mode="lines",
+            line=dict(color=col_s20, width=1, dash="dash"),
+            hovertemplate=(
+                f"<b>{sym} SMA20</b><br>"
+                "Date: %{x|%b %d, %Y}<br>"
+                "SMA20: $%{y:.2f}<extra></extra>"
             ),
-            row=r, col=1,
-        )
-        # SMA50
-        fig.add_trace(
-            go.Scatter(
-                x=s["date"], y=s["sma_50"],
-                name="SMA 50" if sym == "AAPL" else None,
-                line=dict(color=COLOR["SMA50"], width=1, dash="dot"),
-                legendgroup="SMA50",
-                showlegend=(sym == "AAPL"),
+        ))
+
+        # SMA 50 — dotted, mid shade
+        s_sma50 = s.dropna(subset=["sma_50"])
+        fig.add_trace(go.Scatter(
+            x=s_sma50["date"],
+            y=s_sma50["sma_50"],
+            name=f"{sym} SMA50",
+            legendgroup=f"{sym}_sma",
+            mode="lines",
+            line=dict(color=col_s50, width=1, dash="dot"),
+            hovertemplate=(
+                f"<b>{sym} SMA50</b><br>"
+                "Date: %{x|%b %d, %Y}<br>"
+                "SMA50: $%{y:.2f}<extra></extra>"
             ),
-            row=r, col=1,
-        )
-        # SMA200
-        fig.add_trace(
-            go.Scatter(
-                x=s["date"], y=s["sma_200"],
-                name="SMA 200" if sym == "AAPL" else None,
-                line=dict(color=COLOR["SMA200"], width=1, dash="dash"),
-                legendgroup="SMA200",
-                showlegend=(sym == "AAPL"),
+        ))
+
+    fig.update_layout(
+        paper_bgcolor=COLOR["paper"],
+        plot_bgcolor=COLOR["bg"],
+        font=dict(family=FONT_FMLY, color=COLOR["text"]),
+        title=dict(
+            text=(
+                "Price History & Moving Averages"
+                "<br><sup style='color:#86868b;font-size:13px'>"
+                "Adjusted close price with SMA 20 and SMA 50 trend lines"
+                "</sup>"
             ),
-            row=r, col=1,
-        )
-
-
-def add_daily_return_traces(fig, df: pd.DataFrame, row_map: dict):
-    """Chart 2: Daily return % bar chart, green/red, one subplot per symbol."""
-    for sym in SYMBOLS:
-        r = row_map[sym]
-        s = df[df["symbol"] == sym].sort_values("date").dropna(subset=["daily_return"])
-
-        bar_colors = [COLOR["pos"] if v >= 0 else COLOR["neg"] for v in s["daily_return"]]
-        fig.add_trace(
-            go.Bar(
-                x=s["date"], y=s["daily_return"],
-                name=sym,
-                marker_color=bar_colors,
-                marker_line_width=0,
-                legendgroup=f"dr_{sym}",
-                showlegend=True,
+            font=dict(size=20, color=COLOR["text"]),
+            x=0.05, xanchor="left",
+        ),
+        legend=dict(
+            bgcolor="rgba(17,17,17,0.8)",
+            bordercolor=COLOR["border"],
+            borderwidth=1,
+            font=dict(color=COLOR["text"], size=11, family=FONT_FMLY),
+            orientation="v",
+            yanchor="top", y=1,
+            xanchor="left", x=1.01,
+        ),
+        xaxis=dict(
+            **AXIS_STYLE,
+            title="Date",
+            rangeselector=dict(
+                buttons=[
+                    dict(count=1, label="1M", step="month", stepmode="backward"),
+                    dict(count=3, label="3M", step="month", stepmode="backward"),
+                    dict(count=6, label="6M", step="month", stepmode="backward"),
+                    dict(step="all", label="All"),
+                ],
+                bgcolor=COLOR["card"],
+                activecolor=COLOR["AAPL"],
+                bordercolor=COLOR["border"],
+                font=dict(color=COLOR["text"], size=11, family=FONT_FMLY),
             ),
-            row=r, col=1,
-        )
+            rangeslider=dict(visible=False),
+            type="date",
+        ),
+        yaxis=dict(
+            **AXIS_STYLE,
+            title="Price (USD)",
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor="#1a1a1a",
+            bordercolor=COLOR["border"],
+            font=dict(color=COLOR["text"], family=FONT_FMLY),
+        ),
+        margin=dict(l=60, r=140, t=100, b=60),
+        height=600,
+    )
+    return fig
 
 
-def add_cumulative_return_trace(fig, df: pd.DataFrame, row: int, col: int = 1):
-    """Chart 3: Cumulative return %, all symbols on same chart."""
-    for sym in SYMBOLS:
-        s = df[df["symbol"] == sym].sort_values("date").dropna(subset=["cumulative_return"])
-        fig.add_trace(
-            go.Scatter(
-                x=s["date"], y=s["cumulative_return"],
-                name=sym,
-                line=dict(color=COLOR[sym], width=2),
-                legendgroup=f"cr_{sym}",
-                showlegend=True,
-            ),
-            row=row, col=col,
-        )
-    # Zero reference line — use add_shape to avoid conflict with Table subplot
-    fig.add_shape(type="line", x0=0, x1=1, xref="paper",
-                  y0=0, y1=0, yref=f"y{row}",
-                  line=dict(color="rgba(255,255,255,0.2)", width=1, dash="dot"))
+def add_tile2_traces(fig: go.Figure, df: pd.DataFrame, row: int):
+    """Add Tile 2 traces to the main dashboard figure."""
+    tile2 = build_tile2_figure(df)
+    for trace in tile2.data:
+        t = trace
+        t.legendgroup = f"tile2_{t.legendgroup}"
+        fig.add_trace(t, row=row, col=1)
 
 
-def add_volatility_trace(fig, df: pd.DataFrame, row: int, col: int = 1):
-    """Chart 4: Rolling 20-day volatility, all symbols on same chart."""
-    for sym in SYMBOLS:
-        s = df[df["symbol"] == sym].sort_values("date").dropna(subset=["rolling_volatility_20d"])
-        fig.add_trace(
-            go.Scatter(
-                x=s["date"], y=s["rolling_volatility_20d"],
-                name=sym,
-                line=dict(color=COLOR[sym], width=2),
-                legendgroup=f"vol_{sym}",
-                showlegend=True,
-            ),
-            row=row, col=col,
-        )
+# ===========================================================================
+# 5. Tile 3 (Bonus) — Drawdown Over Time
+# ===========================================================================
+def build_drawdown_figure(df: pd.DataFrame) -> go.Figure:
+    """Area chart of drawdown (%) over time for each symbol."""
+    fig = go.Figure()
 
-
-def add_drawdown_trace(fig, df: pd.DataFrame, row: int, col: int = 1):
-    """Chart 5: Drawdown % area chart filled below zero."""
     for sym in SYMBOLS:
         s = df[df["symbol"] == sym].sort_values("date").dropna(subset=["drawdown"])
-        fill_color = COLOR[sym].replace("#", "")
-        # Convert hex to rgba for fill
+        if s.empty:
+            continue
+
         hex_col = COLOR[sym].lstrip("#")
         r_val   = int(hex_col[0:2], 16)
         g_val   = int(hex_col[2:4], 16)
         b_val   = int(hex_col[4:6], 16)
-        fill    = f"rgba({r_val},{g_val},{b_val},0.18)"
+        fill    = f"rgba({r_val},{g_val},{b_val},0.15)"
 
-        fig.add_trace(
-            go.Scatter(
-                x=s["date"], y=s["drawdown"],
-                name=sym,
-                line=dict(color=COLOR[sym], width=1.5),
-                fill="tozeroy",
-                fillcolor=fill,
-                legendgroup=f"dd_{sym}",
-                showlegend=True,
+        fig.add_trace(go.Scatter(
+            x=s["date"],
+            y=s["drawdown"],
+            name=sym,
+            legendgroup=f"dd_{sym}",
+            mode="lines",
+            line=dict(color=COLOR[sym], width=1.5),
+            fill="tozeroy",
+            fillcolor=fill,
+            hovertemplate=(
+                f"<b>{sym} Drawdown</b><br>"
+                "Date: %{x|%b %d, %Y}<br>"
+                "Drawdown: %{y:.2f}%<extra></extra>"
             ),
-            row=row, col=col,
-        )
-    fig.add_shape(type="line", x0=0, x1=1, xref="paper",
-                  y0=0, y1=0, yref=f"y{row}",
-                  line=dict(color="rgba(255,255,255,0.2)", width=1, dash="dot"))
+        ))
+
+    fig.add_shape(
+        type="line", x0=0, x1=1, xref="paper",
+        y0=0, y1=0, yref="y",
+        line=dict(color=COLOR["zero_line"], width=1, dash="dot"),
+    )
+    return fig
 
 
-def add_excess_return_trace(fig, df: pd.DataFrame, row: int, col: int = 1):
-    """Chart 6: Excess return vs SPY bar chart (AAPL & TSLA only)."""
-    for sym in ["AAPL", "TSLA"]:
-        s = df[df["symbol"] == sym].sort_values("date").dropna(subset=["excess_return_vs_spy"])
-        bar_colors = [COLOR["pos"] if v >= 0 else COLOR["neg"] for v in s["excess_return_vs_spy"]]
-        fig.add_trace(
-            go.Bar(
-                x=s["date"], y=s["excess_return_vs_spy"],
-                name=sym,
-                marker_color=bar_colors,
-                marker_line_width=0,
-                legendgroup=f"er_{sym}",
-                showlegend=True,
-            ),
-            row=row, col=col,
-        )
+def add_tile3_traces(fig: go.Figure, df: pd.DataFrame, row: int):
+    """Add Tile 3 (drawdown) traces to the main dashboard figure."""
+    tile3 = build_drawdown_figure(df)
+    for trace in tile3.data:
+        t = trace
+        t.legendgroup = f"tile3_{t.legendgroup}"
+        fig.add_trace(t, row=row, col=1)
+
+    fig.add_shape(
+        type="line", x0=0, x1=1, xref="paper",
+        y0=0, y1=0, yref=f"y{row}",
+        line=dict(color=COLOR["zero_line"], width=1, dash="dot"),
+    )
 
 
 # ===========================================================================
-# 4. Assemble full dashboard figure
+# 6. Assemble full dashboard figure
 # ===========================================================================
 def build_dashboard(df: pd.DataFrame) -> go.Figure:
-    date_min = df["date"].min().strftime("%b %d, %Y")
-    date_max = df["date"].max().strftime("%b %d, %Y")
+    date_min  = df["date"].min().strftime("%b %d, %Y")
+    date_max  = df["date"].max().strftime("%b %d, %Y")
     generated = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # ------------------------------------------------------------------
-    # Row layout (row indices, 1-based):
-    #   1      — summary table
-    #   2,3,4  — price chart (one sub-row per symbol AAPL/TSLA/SPY)
-    #   5,6,7  — daily return bars (one sub-row per symbol)
-    #   8      — cumulative return
-    #   9      — rolling volatility
-    #   10     — drawdown
-    #   11     — excess return vs SPY
-    # ------------------------------------------------------------------
-    ROW_TABLE   = 1
-    ROW_PRICE   = {sym: i for i, sym in enumerate(SYMBOLS, start=2)}   # rows 2,3,4
-    ROW_DRET    = {sym: i for i, sym in enumerate(SYMBOLS, start=5)}   # rows 5,6,7
-    ROW_CUMRET  = 8
-    ROW_VOL     = 9
-    ROW_DD      = 10
-    ROW_EXCESS  = 11
-    N_ROWS      = 11
-
-    # Row heights — table short, price rows taller, rest medium
-    row_heights = (
-        [0.06]           # table
-        + [0.085] * 3    # price subplots
-        + [0.065] * 3    # daily return subplots
-        + [0.095]        # cumulative
-        + [0.085]        # volatility
-        + [0.085]        # drawdown
-        + [0.085]        # excess return
-    )
-
-    subplot_titles = (
-        [""]                                         # table (no title above it)
-        + [f"<b>{sym}</b> — Adjusted Close & Moving Averages" for sym in SYMBOLS]
-        + [f"<b>{sym}</b> — Daily Return (%)" for sym in SYMBOLS]
-        + ["<b>Cumulative Return (%)</b> — All Symbols"]
-        + ["<b>Rolling 20-Day Volatility (Annualised %)</b> — All Symbols"]
-        + ["<b>Drawdown (%) from 52-Week High</b> — All Symbols"]
-        + ["<b>Excess Return vs SPY (%)</b> — AAPL & TSLA"]
-    )
-
-    specs = [[{"type": "table"}]] + [[{"type": "scatter"}]] * (N_ROWS - 1)
+    ROW_TABLE = 1
+    ROW_TILE1 = 2   # Categorical bar chart
+    ROW_TILE2 = 3   # Time-series price + SMAs
+    ROW_TILE3 = 4   # Drawdown area chart
 
     fig = make_subplots(
-        rows=N_ROWS,
-        cols=1,
-        shared_xaxes=False,
-        vertical_spacing=0.022,
-        row_heights=row_heights,
-        subplot_titles=subplot_titles,
-        specs=specs,
+        rows=4, cols=1,
+        row_heights=[0.12, 0.28, 0.32, 0.28],
+        subplot_titles=[
+            "",
+            "Performance Snapshot by Symbol",
+            "Price History & Moving Averages",
+            "Drawdown Over Time",
+        ],
+        vertical_spacing=0.06,
+        specs=[
+            [{"type": "table"}],
+            [{"type": "xy"}],
+            [{"type": "xy"}],
+            [{"type": "xy"}],
+        ],
     )
 
-    # ── Table ──────────────────────────────────────────────────────────
-    print("[INFO] Building summary table ...")
-    fig.add_trace(build_summary_table(df), row=ROW_TABLE, col=1)
+    # ── KPI Summary Table ──────────────────────────────────────────────────
+    print("[INFO] Building KPI summary table ...")
+    fig.add_trace(build_kpi_table(df), row=ROW_TABLE, col=1)
 
-    # ── Chart 1: Price + SMAs ──────────────────────────────────────────
-    print("[INFO] Building price & moving average charts ...")
-    add_price_traces(fig, df, ROW_PRICE)
+    # ── Tile 1: Categorical bar chart ─────────────────────────────────────
+    print("[INFO] Building Tile 1 — Performance Snapshot (categorical) ...")
+    add_tile1_traces(fig, df, row=ROW_TILE1)
 
-    # ── Chart 2: Daily return bars ─────────────────────────────────────
-    print("[INFO] Building daily return charts ...")
-    add_daily_return_traces(fig, df, ROW_DRET)
+    # ── Tile 2: Time-series price + SMAs ──────────────────────────────────
+    print("[INFO] Building Tile 2 — Price History & Moving Averages (temporal) ...")
+    add_tile2_traces(fig, df, row=ROW_TILE2)
 
-    # ── Chart 3: Cumulative return ─────────────────────────────────────
-    print("[INFO] Building cumulative return chart ...")
-    add_cumulative_return_trace(fig, df, row=ROW_CUMRET)
+    # ── Tile 3: Drawdown area chart ───────────────────────────────────────
+    print("[INFO] Building Tile 3 — Drawdown Over Time ...")
+    add_tile3_traces(fig, df, row=ROW_TILE3)
 
-    # ── Chart 4: Rolling volatility ────────────────────────────────────
-    print("[INFO] Building rolling volatility chart ...")
-    add_volatility_trace(fig, df, row=ROW_VOL)
-
-    # ── Chart 5: Drawdown ──────────────────────────────────────────────
-    print("[INFO] Building drawdown chart ...")
-    add_drawdown_trace(fig, df, row=ROW_DD)
-
-    # ── Chart 6: Excess return vs SPY ──────────────────────────────────
-    print("[INFO] Building excess return chart ...")
-    add_excess_return_trace(fig, df, row=ROW_EXCESS)
-
-    # ------------------------------------------------------------------
-    # Global layout
-    # ------------------------------------------------------------------
+    # ── Global layout ──────────────────────────────────────────────────────
     fig.update_layout(
+        height=2000,
         template="plotly_dark",
         paper_bgcolor=COLOR["paper"],
         plot_bgcolor=COLOR["bg"],
-        font=dict(family=FONT_FMLY, color=COLOR["text"], size=12),
+        font=dict(
+            family=FONT_FMLY,
+            color=COLOR["text"],
+            size=12,
+        ),
         title=dict(
             text=(
-                "<b style='font-size:22px'>Apple & Tesla Market Intelligence Dashboard</b>"
-                f"<br><span style='font-size:12px;color:rgba(255,255,255,0.55)'>"
-                f"Data: {date_min} — {date_max} &nbsp;|&nbsp; Generated: {generated}</span>"
+                "Market Intelligence Dashboard"
+                "<br><sup style='color:#86868b'>"
+                f"AAPL · TSLA · SPY — Last 100 Trading Days"
+                f"&nbsp;&nbsp;|&nbsp;&nbsp;"
+                f"Data: {date_min} – {date_max}"
+                f"&nbsp;&nbsp;|&nbsp;&nbsp;"
+                f"Generated: {generated}"
+                "</sup>"
             ),
-            x=0.5,
-            xanchor="center",
-            y=0.995,
-            yanchor="top",
-            font=dict(family=FONT_FMLY, color=COLOR["text"]),
+            font=dict(size=28, color=COLOR["text"], family=FONT_FMLY),
+            x=0.05, xanchor="left", y=0.98,
         ),
         legend=dict(
-            bgcolor="rgba(17,17,17,0.85)",
+            bgcolor="rgba(17,17,17,0.8)",
             bordercolor=COLOR["border"],
             borderwidth=1,
-            font=dict(size=11, family=FONT_FMLY, color=COLOR["text"]),
-            orientation="h",
-            yanchor="bottom",
-            y=1.01,
-            xanchor="right",
-            x=1,
+            font=dict(color=COLOR["text"], size=11, family=FONT_FMLY),
         ),
-        margin=dict(l=60, r=40, t=80, b=40),
+        margin=dict(l=60, r=60, t=100, b=60),
         hovermode="x unified",
         hoverlabel=dict(
-            bgcolor="rgba(17,17,17,0.92)",
+            bgcolor="#1a1a1a",
             bordercolor=COLOR["border"],
-            font=dict(family=FONT_FMLY, size=11, color=COLOR["text"]),
+            font=dict(color=COLOR["text"], family=FONT_FMLY),
         ),
-        height=3800,
     )
 
-    # ── Per-axis styling ───────────────────────────────────────────────
-    # Price subplots y-axes
-    for sym, r in ROW_PRICE.items():
-        fig.update_yaxes(_axis_style(title="USD ($)"), row=r, col=1)
-        fig.update_xaxes(
-            dict(showgrid=False, showticklabels=(r == max(ROW_PRICE.values())),
-                 color="rgba(255,255,255,0.45)", tickfont=dict(size=10, family=FONT_FMLY),
-                 linecolor=COLOR["border"], showline=True),
-            row=r, col=1,
-        )
+    # ── Subplot title styling ──────────────────────────────────────────────
+    for annotation in fig.layout.annotations:
+        annotation.font.size    = 16
+        annotation.font.color   = COLOR["text"]
+        annotation.font.family  = FONT_FMLY
+        annotation.x            = 0.05
+        annotation.xanchor      = "left"
 
-    # Daily return subplots
-    for sym, r in ROW_DRET.items():
-        fig.update_yaxes(_axis_style(title="Return (%)"), row=r, col=1)
-        fig.update_xaxes(
-            dict(showgrid=False, showticklabels=(r == max(ROW_DRET.values())),
-                 color="rgba(255,255,255,0.45)", tickfont=dict(size=10, family=FONT_FMLY),
-                 linecolor=COLOR["border"], showline=True),
-            row=r, col=1,
-        )
+    # ── Axis styling — Tile 1 (row 2) ─────────────────────────────────────
+    fig.update_xaxes(
+        row=ROW_TILE1, col=1,
+        showgrid=False,
+        **{k: v for k, v in AXIS_STYLE.items() if k not in ("showgrid",)},
+        title_text="Metric",
+    )
+    fig.update_yaxes(
+        row=ROW_TILE1, col=1,
+        **{k: v for k, v in AXIS_STYLE.items() if k not in ("zerolinecolor",)},
+        title_text="Value (%)",
+        zeroline=True,
+        zerolinecolor=COLOR["zero_line"],
+        zerolinewidth=1,
+    )
 
-    # Cumulative return
-    fig.update_yaxes(_axis_style(title="Cumul. Return (%)"), row=ROW_CUMRET, col=1)
-    fig.update_xaxes(showgrid=False, row=ROW_CUMRET, col=1)
+    # ── Axis styling — Tile 2 (row 3) ─────────────────────────────────────
+    fig.update_xaxes(
+        row=ROW_TILE2, col=1,
+        **AXIS_STYLE,
+        title_text="Date",
+        rangeselector=dict(
+            buttons=[
+                dict(count=1, label="1M", step="month", stepmode="backward"),
+                dict(count=3, label="3M", step="month", stepmode="backward"),
+                dict(count=6, label="6M", step="month", stepmode="backward"),
+                dict(step="all", label="All"),
+            ],
+            bgcolor=COLOR["card"],
+            activecolor=COLOR["AAPL"],
+            bordercolor=COLOR["border"],
+            font=dict(color=COLOR["text"], size=11, family=FONT_FMLY),
+        ),
+        type="date",
+    )
+    fig.update_yaxes(
+        row=ROW_TILE2, col=1,
+        **AXIS_STYLE,
+        title_text="Price (USD)",
+    )
 
-    # Volatility
-    fig.update_yaxes(_axis_style(title="Volatility (%)"), row=ROW_VOL, col=1)
-    fig.update_xaxes(showgrid=False, row=ROW_VOL, col=1)
-
-    # Drawdown
-    fig.update_yaxes(_axis_style(title="Drawdown (%)"), row=ROW_DD, col=1)
-    fig.update_xaxes(showgrid=False, row=ROW_DD, col=1)
-
-    # Excess return
-    fig.update_yaxes(_axis_style(title="Excess Ret. (%)"), row=ROW_EXCESS, col=1)
-    fig.update_xaxes(showgrid=False, row=ROW_EXCESS, col=1)
-
-    # Subplot title styling (annotation colour)
-    for ann in fig.layout.annotations:
-        ann.font.update(size=12, color="rgba(255,255,255,0.70)", family=FONT_FMLY)
+    # ── Axis styling — Tile 3 (row 4) ─────────────────────────────────────
+    fig.update_xaxes(
+        row=ROW_TILE3, col=1,
+        **AXIS_STYLE,
+        title_text="Date",
+        type="date",
+    )
+    fig.update_yaxes(
+        row=ROW_TILE3, col=1,
+        **{k: v for k, v in AXIS_STYLE.items() if k not in ("zerolinecolor",)},
+        title_text="Drawdown (%)",
+        zeroline=True,
+        zerolinecolor=COLOR["zero_line"],
+        zerolinewidth=1,
+    )
 
     return fig
 
 
 # ===========================================================================
-# 5. Save to HTML
+# 7. Export standalone tile PNGs
+# ===========================================================================
+def export_tile_screenshots(df: pd.DataFrame):
+    """Export Tile 1 and Tile 2 as standalone PNG screenshots using kaleido."""
+    os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+
+    tile1_path = os.path.join(SCREENSHOTS_DIR, "tile1_categorical.png")
+    tile2_path = os.path.join(SCREENSHOTS_DIR, "tile2_temporal.png")
+
+    print("[INFO] Exporting Tile 1 screenshot ...")
+    try:
+        fig_tile1 = build_tile1_figure(df)
+        fig_tile1.write_image(tile1_path, width=1200, height=600, scale=2)
+        print(f"[INFO] Tile 1 saved to {tile1_path}")
+    except Exception as exc:
+        print(f"[WARN] Could not export Tile 1 PNG: {exc}")
+        print("[WARN] Ensure kaleido is installed: pip install kaleido>=0.2.1")
+
+    print("[INFO] Exporting Tile 2 screenshot ...")
+    try:
+        fig_tile2 = build_tile2_figure(df)
+        fig_tile2.write_image(tile2_path, width=1200, height=600, scale=2)
+        print(f"[INFO] Tile 2 saved to {tile2_path}")
+    except Exception as exc:
+        print(f"[WARN] Could not export Tile 2 PNG: {exc}")
+        print("[WARN] Ensure kaleido is installed: pip install kaleido>=0.2.1")
+
+
+# ===========================================================================
+# 8. Save main dashboard HTML
 # ===========================================================================
 def save_dashboard(fig: go.Figure):
     os.makedirs(SCRIPT_DIR, exist_ok=True)
@@ -556,7 +762,7 @@ def save_dashboard(fig: go.Figure):
             "toImageButtonOptions": {
                 "format": "png",
                 "filename": "market_intelligence_dashboard",
-                "height": 3800,
+                "height": 2000,
                 "width": 1600,
                 "scale": 2,
             },
@@ -567,20 +773,23 @@ def save_dashboard(fig: go.Figure):
 
 
 # ===========================================================================
-# 6. Entry point
+# 9. Entry point
 # ===========================================================================
 def main():
-    print("=" * 60)
-    print("  Apple & Tesla Market Intelligence Dashboard Generator")
-    print("=" * 60)
+    print("=" * 65)
+    print("  Market Intelligence Dashboard Generator  —  Apple Design")
+    print("=" * 65)
 
     df  = fetch_data()
     fig = build_dashboard(df)
     save_dashboard(fig)
+    export_tile_screenshots(df)
 
-    print("=" * 60)
-    print("[DONE] Open dashboard/dashboard.html in your browser.")
-    print("=" * 60)
+    print("=" * 65)
+    print(f"[DONE] Dashboard → {OUTPUT_HTML}")
+    print(f"[DONE] Screenshots → {SCREENSHOTS_DIR}/")
+    print("       Open dashboard/dashboard.html in your browser.")
+    print("=" * 65)
 
 
 if __name__ == "__main__":

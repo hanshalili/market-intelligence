@@ -771,58 +771,53 @@ If the `{% test %}` wrapper is omitted, dbt cannot register the test and the `db
 
 ## 12. Dashboard
 
-**Tool**: Looker Studio — free, no infrastructure, connects natively to BigQuery.
+**Tool**: [Plotly](https://plotly.com/python/) — open source, Python, no license required. Generates a fully self-contained interactive HTML file that opens in any browser.
 
 **Source table**: `{project_id}.market_analytics.mart_daily_metrics`
 
-### Setup steps
+**Design**: Apple-inspired dark theme — black background, SF Pro Display font, Apple blue / Tesla red / Apple green symbol palette, minimal layout with generous whitespace.
 
-1. Go to [lookerstudio.google.com](https://lookerstudio.google.com).
-2. Click **+ Create → Report**.
-3. Select **BigQuery** as the data source.
-4. Navigate to your project → `market_analytics` → `mart_daily_metrics` → **Connect**.
-5. Click **Add to Report**.
+### How to access the dashboard
 
-### Global filters (add to every page)
+**Option A — Run locally** (requires Python and GCP credentials):
 
-- **Symbol filter**: Dropdown control, field: `symbol`, allow multi-select. Lets viewers toggle between AAPL, TSLA, SPY, or any combination.
-- **Date range control**: Date range selector, field: `date`, default: last 12 months.
+```bash
+# Install dashboard dependencies
+pip install -r dashboard/requirements.txt
 
-### Tile 1 — Price Trend with Moving Averages
+# Generate the dashboard (reads from BigQuery, writes dashboard/dashboard.html)
+make dashboard
+# — or —
+python dashboard/generate_dashboard.py
+```
 
-**Chart type**: Time series (line)
+**Option B — Share the generated HTML file** (no installation required for viewers):
 
-**Dimension**: `date`
+The generated `dashboard/dashboard.html` is a **fully self-contained file** — all JavaScript, CSS, and data are embedded inline. Share it via email, Google Drive, Slack, or any file-sharing service. The recipient opens it in any modern browser; no Python, no GCP credentials, and no internet connection are required.
 
-**Metrics**: `adjusted_close` (solid), `sma_20` (dashed), `sma_50` (dotted), `sma_200` (thin)
+**Option C — Host on GitHub Pages**:
 
-**Interpretation**:
-- When `adjusted_close` crosses above `sma_200` → potential bullish signal (golden cross setup)
-- When `sma_20` drops below `sma_50` → short-term bearish momentum
-- The gap between price and the SMAs shows how extended or oversold the stock is
+1. Go to your GitHub repo → **Settings → Pages**
+2. Source: **Deploy from branch** → `main` → `/root`
+3. Copy `dashboard/dashboard.html` to the repository root (rename to `dashboard.html` if needed) and commit it
+4. Access the live dashboard at:
+   ```
+   https://hanshalili.github.io/Market-Intelligence-Data-Pipeline/dashboard.html
+   ```
 
-### Tile 2 — Risk & Market Comparison
+### Dashboard tiles
 
-**Chart type**: Combo chart (dual Y-axis)
+| Tile | Type | What it shows |
+|---|---|---|
+| **KPI Summary** | Table | Latest price, 1-day return, cumulative return, volatility, and drawdown for each symbol |
+| **Tile 1 — Performance Snapshot** | Grouped bar chart (categorical) | Cumulative return, average daily volatility, and current drawdown side-by-side for AAPL, TSLA, SPY |
+| **Tile 2 — Price History & Moving Averages** | Time-series line chart (temporal) | Adjusted close price with SMA 20 and SMA 50 trend lines; includes 1M / 3M / 6M / All range selector |
+| **Tile 3 — Drawdown Over Time** | Area chart (temporal) | How far each symbol is from its trailing 52-week high, filled below zero |
 
-**Dimension**: `date`
+### Tile 1 — Performance Snapshot by Symbol (Categorical)
 
-**Left Y-axis (bar)**: `rolling_volatility_20d` — high bars indicate elevated near-term risk; spikes often coincide with earnings or macro events
+![Tile 1](screenshots/tile1_categorical.png)
 
-**Right Y-axis (line)**: `excess_return_vs_spy` — values above 0 mean the stock is outperforming the S&P 500; persistent negative values mean SPY is the better hold
+### Tile 2 — Price History & Moving Averages (Temporal)
 
-### Tile 3 — Cumulative Return Comparison
-
-**Chart type**: Time series (line), all three symbols on the same axes
-
-**Metric**: `cumulative_return`
-
-**Interpretation**: "If I had invested on day 1 of this dataset, what would my return be today compared to holding SPY?"
-
-### Tile 4 — Drawdown
-
-**Chart type**: Area chart (area fills downward from 0)
-
-**Metric**: `drawdown` per symbol
-
-**Interpretation**: How far each stock is from its trailing 52-week high. A value of -30% means the stock has fallen 30% from its peak. When drawdown starts recovering toward 0, the stock is approaching a new high.
+![Tile 2](screenshots/tile2_temporal.png)
