@@ -545,8 +545,9 @@ def build_drawdown_figure(df: pd.DataFrame) -> go.Figure:
     )
 
     fig.update_layout(
-        paper_bgcolor=COLOR["paper"],
-        plot_bgcolor=COLOR["bg"],
+        template="none",
+        paper_bgcolor="#000000",
+        plot_bgcolor="#0a0a0a",
         font=dict(family=FONT_FMLY, color=COLOR["text"]),
         title=dict(
             text=(
