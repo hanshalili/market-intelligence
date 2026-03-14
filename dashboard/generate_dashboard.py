@@ -543,6 +543,51 @@ def build_drawdown_figure(df: pd.DataFrame) -> go.Figure:
         y0=0, y1=0, yref="y",
         line=dict(color=COLOR["zero_line"], width=1, dash="dot"),
     )
+
+    fig.update_layout(
+        paper_bgcolor=COLOR["paper"],
+        plot_bgcolor=COLOR["bg"],
+        font=dict(family=FONT_FMLY, color=COLOR["text"]),
+        title=dict(
+            text=(
+                "Drawdown Over Time"
+                "<br><sup style='color:#86868b;font-size:13px'>"
+                "% below trailing 52-week high — AAPL, TSLA, SPY"
+                "</sup>"
+            ),
+            font=dict(size=20, color=COLOR["text"]),
+            x=0.05, xanchor="left",
+        ),
+        legend=dict(
+            bgcolor="rgba(17,17,17,0.8)",
+            bordercolor=COLOR["border"],
+            borderwidth=1,
+            font=dict(color=COLOR["text"], size=12, family=FONT_FMLY),
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="right", x=1,
+        ),
+        xaxis=dict(
+            **AXIS_STYLE,
+            title="Date",
+            type="date",
+        ),
+        yaxis=dict(
+            **{k: v for k, v in AXIS_STYLE.items() if k != "zerolinecolor"},
+            title="Drawdown (%)",
+            zeroline=True,
+            zerolinecolor=COLOR["zero_line"],
+            zerolinewidth=1,
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor="#1a1a1a",
+            bordercolor=COLOR["border"],
+            font=dict(color=COLOR["text"], family=FONT_FMLY),
+        ),
+        margin=dict(l=60, r=60, t=100, b=60),
+        height=600,
+    )
     return fig
 
 
