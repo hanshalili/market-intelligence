@@ -1,0 +1,33 @@
+# ==============================================================================
+# profiles.yml — dbt BigQuery connection profile
+#
+# This file is mounted inside the Airflow container at /opt/airflow/dbt/
+# Environment variables are injected by Docker Compose from .env
+# ==============================================================================
+
+market_intelligence:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "{{ env_var('BQ_DATASET', 'market_analytics') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '/opt/airflow/credentials/service_account.json') }}"
+      location: US
+      priority: interactive
+      timeout_seconds: 300
+      retries: 1
+      threads: 4
+
+    prod:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "{{ env_var('BQ_DATASET', 'market_analytics') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '/opt/airflow/credentials/service_account.json') }}"
+      location: US
+      priority: batch
+      timeout_seconds: 600
+      retries: 2
+      threads: 8

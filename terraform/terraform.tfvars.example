@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — never commit real values.
+
+project_id  = "your-gcp-project-id"
+region      = "us-central1"
+bq_location = "US"
+bq_dataset  = "market_analytics"
+environment = "dev"

@@ -1,0 +1,4 @@
+packages:
+  # dbt_utils provides the unique_combination_of_columns test used in schema.yml
+  - package: dbt-labs/dbt_utils
+    version: [">=1.0.0", "<2.0.0"]

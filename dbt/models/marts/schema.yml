@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: mart_daily_metrics
+    description: >
+      Analytics mart table: daily financial metrics for AAPL, TSLA, and SPY.
+      Partitioned by date, clustered by symbol.
+      Produced by dbt transformations from the stg_stock_prices staging view.
+      Consumed by the Looker Studio dashboard.
+
+    # Model-level tests — uniqueness constraint across two columns
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - date
+            - symbol
+
+    columns:
+      - name: date
+        description: "Trading date (partition key)."
+        tests:
+          - not_null
+
+      - name: symbol
+        description: "Ticker symbol: AAPL, TSLA, or SPY (cluster key)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["AAPL", "TSLA", "SPY"]
+
+      - name: adjusted_close
+        description: "Dividend and split adjusted closing price."
+        tests:
+          - not_null
+          - assert_positive_adjusted_close
+
+      - name: daily_return
+        description: "Percentage return vs the previous trading day."
+        # NULL for the very first row per symbol — acceptable
+
+      - name: cumulative_return
+        description: "Percentage gain from the first available date in the dataset."
+
+      - name: sma_20
+        description: "20-day simple moving average of adjusted_close."
+
+      - name: sma_50
+        description: "50-day simple moving average of adjusted_close."
+
+      - name: sma_200
+        description: "200-day simple moving average of adjusted_close."
+
+      - name: rolling_volatility_20d
+        description: "Annualised standard deviation of daily returns over the last 20 trading days."
+
+      - name: drawdown
+        description: "Percentage below the rolling 52-week high (always <= 0)."
+        tests:
+          - assert_drawdown_non_positive
+
+      - name: spy_daily_return
+        description: "SPY daily return on the same trading date (benchmark)."
+
+      - name: excess_return_vs_spy
+        description: "Stock daily_return minus SPY daily_return (alpha proxy)."
+
+      - name: transformed_at
+        description: "UTC timestamp when dbt produced this row."
+        tests:
+          - not_null

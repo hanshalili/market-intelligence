@@ -1,0 +1,50 @@
+version: 2
+
+sources:
+  - name: market_analytics
+    description: "BigQuery dataset containing raw and curated stock market data."
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: market_analytics
+    tables:
+      - name: raw_stock_prices
+        description: >
+          Raw table loaded daily by Airflow from curated GCS Parquet files.
+          Partitioned by date, clustered by symbol.
+        columns:
+          - name: date
+            description: "Trading date (partition key)."
+            tests:
+              - not_null
+          - name: symbol
+            description: "Ticker symbol: AAPL, TSLA, or SPY."
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ["AAPL", "TSLA", "SPY"]
+          - name: adjusted_close
+            description: "Dividend and split adjusted closing price."
+            tests:
+              - not_null
+          - name: volume
+            description: "Shares traded on this day."
+            tests:
+              - not_null
+
+models:
+  - name: stg_stock_prices
+    description: >
+      Staging view: applies consistent types, removes nulls and bad rows,
+      and deduplicates by (date, symbol).
+    columns:
+      - name: date
+        description: "Trading date."
+        tests:
+          - not_null
+      - name: symbol
+        description: "Ticker symbol."
+        tests:
+          - not_null
+      - name: adjusted_close
+        description: "Split/dividend adjusted close price."
+        tests:
+          - not_null

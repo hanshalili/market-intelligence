@@ -1,0 +1,38 @@
+# Secrets & credentials
+.env
+credentials/
+airflow/credentials/
+terraform/credentials/
+*.json
+!terraform/schemas/*.json  # Schema files are safe to commit
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfvars
+terraform/.terraform.lock.hcl
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# Airflow
+airflow/logs/
+airflow/plugins/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Local data
+/tmp/market_data/
+
+# macOS
+.DS_Store
