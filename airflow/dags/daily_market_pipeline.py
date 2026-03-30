@@ -21,10 +21,8 @@ Design choices:
 - Empty-result days (holidays) are handled without failing the pipeline.
 """
 
-import json
 import logging
-import os
-from datetime import date, datetime, timedelta
+from datetime import timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -55,8 +53,8 @@ with DAG(
     # Run at 21:00 UTC Monday-Friday (after NYSE close at 20:30 UTC)
     schedule_interval="0 21 * * 1-5",
     start_date=days_ago(1),
-    catchup=False,          # Do not backfill missed runs automatically
-    max_active_runs=1,      # Prevent concurrent pipeline runs
+    catchup=False,  # Do not backfill missed runs automatically
+    max_active_runs=1,  # Prevent concurrent pipeline runs
     tags=["market", "daily", "batch"],
     doc_md="""
 ## Daily Market Intelligence Pipeline
@@ -93,12 +91,14 @@ mart_daily_metrics
         Returns: JSON string mapping symbol → local file path.
         """
         import sys
+
         sys.path.insert(0, "/opt/airflow")
 
         from src.config import config
         from src.extract import fetch_daily_adjusted
-        import pandas as pd
-        import os, json, time
+        import json
+        import os
+        import time
 
         execution_date = context["ds"]  # YYYY-MM-DD string
         logger = logging.getLogger(__name__)
@@ -118,11 +118,15 @@ mart_daily_metrics
             df = fetch_daily_adjusted(symbol, output_size="compact")
 
             if df.empty:
-                logger.warning("No data returned for symbol=%s on %s", symbol, execution_date)
+                logger.warning(
+                    "No data returned for symbol=%s on %s", symbol, execution_date
+                )
                 continue
 
             # Save as JSON lines so downstream can reconstruct the DataFrame
-            local_path = os.path.join(raw_dir, f"{symbol.lower()}_{execution_date}.json")
+            local_path = os.path.join(
+                raw_dir, f"{symbol.lower()}_{execution_date}.json"
+            )
             df.to_json(local_path, orient="records", date_format="iso")
             symbol_paths[symbol] = local_path
             logger.info("Saved %d rows for %s to %s", len(df), symbol, local_path)
@@ -151,11 +155,12 @@ mart_daily_metrics
 
         Returns: JSON string mapping symbol → GCS URI.
         """
-        import sys, json, os
+        import json
+        import sys
+
         sys.path.insert(0, "/opt/airflow")
         from src.config import config
         from google.cloud import storage
-        from datetime import datetime
 
         logger = logging.getLogger(__name__)
         execution_date = context["ds"]
@@ -199,9 +204,10 @@ mart_daily_metrics
 
         Returns: local path to the Parquet file.
         """
-        import sys, json
+        import json
+        import sys
+
         sys.path.insert(0, "/opt/airflow")
-        from src.config import config
         from src.transform import dataframe_to_parquet_local
         from datetime import date as date_cls
         import pandas as pd
@@ -246,8 +252,8 @@ mart_daily_metrics
     def _upload_parquet_to_gcs(**context) -> str:
         """Upload the curated Parquet file to GCS curated/ layer."""
         import sys
+
         sys.path.insert(0, "/opt/airflow")
-        from src.config import config
         from src.transform import upload_parquet_to_gcs
         from datetime import date as date_cls
 
@@ -277,6 +283,7 @@ mart_daily_metrics
     def _load_to_bigquery(**context) -> int:
         """Load curated Parquet into BigQuery stg_stock_prices."""
         import sys
+
         sys.path.insert(0, "/opt/airflow")
         from src.load import load_parquet_to_bigquery
         from datetime import date as date_cls
@@ -293,7 +300,9 @@ mart_daily_metrics
 
         exec_date = date_cls.fromisoformat(execution_date_str)
         rows_loaded = load_parquet_to_bigquery(exec_date)
-        logger.info("Loaded %d rows into BigQuery for %s", rows_loaded, execution_date_str)
+        logger.info(
+            "Loaded %d rows into BigQuery for %s", rows_loaded, execution_date_str
+        )
         return rows_loaded
 
     load_bq_task = PythonOperator(
@@ -308,6 +317,7 @@ mart_daily_metrics
     def _verify_bq_load(**context):
         """Assert that at least some rows were loaded for the execution date."""
         import sys
+
         sys.path.insert(0, "/opt/airflow")
         from src.load import verify_load
         from datetime import date as date_cls
@@ -332,7 +342,11 @@ mart_daily_metrics
             f"BigQuery verification FAILED: 0 rows found for date={execution_date_str}. "
             "Check the load job logs."
         )
-        logger.info("Verification PASSED: %d rows in BigQuery for %s", bq_count, execution_date_str)
+        logger.info(
+            "Verification PASSED: %d rows in BigQuery for %s",
+            bq_count,
+            execution_date_str,
+        )
 
     verify_task = PythonOperator(
         task_id="verify_bq_load",
@@ -352,7 +366,7 @@ mart_daily_metrics
             "--profiles-dir /opt/airflow/dbt "
             "--project-dir /opt/airflow/dbt "
             "--select +mart_daily_metrics "
-            "--vars '{\"execution_date\": \"{{ ds }}\"}' "
+            '--vars \'{"execution_date": "{{ ds }}"}\' '
             "--full-refresh "
             "--no-version-check"
         ),

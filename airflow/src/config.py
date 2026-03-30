@@ -22,9 +22,7 @@ class PipelineConfig:
     symbols: List[str] = field(default_factory=lambda: ["AAPL", "TSLA", "SPY"])
 
     # GCP
-    gcp_project_id: str = field(
-        default_factory=lambda: _require_env("GCP_PROJECT_ID")
-    )
+    gcp_project_id: str = field(default_factory=lambda: _require_env("GCP_PROJECT_ID"))
     gcs_bucket_name: str = field(
         default_factory=lambda: _require_env("GCS_BUCKET_NAME")
     )

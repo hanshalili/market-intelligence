@@ -100,8 +100,9 @@ tf-destroy: ## ⚠️  Destroy ALL GCP infrastructure (irreversible)
 # ── Airflow ───────────────────────────────────────────────────────────────────
 airflow-fernet: ## Generate a Fernet key and add it to .env (uses Docker — no host Python needed)
 	@echo "→ Generating Fernet key via Docker..."
-	@FERNET=$$(docker run --rm python:3.11-slim python -c \
-	    "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"); \
+	@FERNET=$$(docker run --rm python:3.11-slim \
+	    bash -c "pip install cryptography -q && python -c \
+	    'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"); \
 	if grep -q "^AIRFLOW_FERNET_KEY=" $(ENV_FILE) 2>/dev/null; then \
 	    sed -i.bak "s|^AIRFLOW_FERNET_KEY=.*|AIRFLOW_FERNET_KEY=$$FERNET|" $(ENV_FILE); \
 	else \
@@ -163,9 +164,9 @@ pipeline-trigger: ## Trigger the daily_market_pipeline DAG for today
 	    --exec-date "$$(date -u +%Y-%m-%dT%H:%M:%S)"
 	@echo "✅ Pipeline triggered. Monitor at http://localhost:8080"
 
-pipeline-status: ## Show the last 5 DAG runs
+pipeline-status: ## Show recent DAG runs
 	@$(COMPOSE) exec webserver \
-	    airflow dags list-runs -d daily_market_pipeline --limit 5
+	    airflow dags list-runs -d daily_market_pipeline -o table
 
 # ── Dashboard — runs in a dedicated Docker container ──────────────────────────
 dashboard: ## Build and run the dashboard container → writes dashboard/dashboard.html

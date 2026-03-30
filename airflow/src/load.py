@@ -58,10 +58,13 @@ def load_parquet_to_bigquery(execution_date: date) -> int:
     parquet_bytes = blob.download_as_bytes()
 
     import io
+
     df = pd.read_parquet(io.BytesIO(parquet_bytes))
 
     if df.empty:
-        logger.warning("Parquet file for %s is empty — skipping BigQuery load.", execution_date)
+        logger.warning(
+            "Parquet file for %s is empty — skipping BigQuery load.", execution_date
+        )
         return 0
 
     # Add audit timestamp
@@ -73,7 +76,9 @@ def load_parquet_to_bigquery(execution_date: date) -> int:
     )
 
     row_count = len(df)
-    logger.info("Preparing to load %d rows into BigQuery for date=%s", row_count, execution_date)
+    logger.info(
+        "Preparing to load %d rows into BigQuery for date=%s", row_count, execution_date
+    )
 
     # Append the partition decorator ($YYYYMMDD) so WRITE_TRUNCATE replaces only
     # this date's partition, not the entire table.
@@ -133,13 +138,16 @@ def verify_load(execution_date: date) -> int:
     result = bq_client.query(query).result()
     row_count = next(result)["row_count"]
 
-    logger.info("BigQuery verification: %d rows found for date=%s", row_count, execution_date)
+    logger.info(
+        "BigQuery verification: %d rows found for date=%s", row_count, execution_date
+    )
     return row_count
 
 
 # ------------------------------------------------------------------------------
 # Internal helpers
 # ------------------------------------------------------------------------------
+
 
 def _build_bq_schema():
     """Return the BigQuery schema matching stg_stock_prices."""

@@ -10,7 +10,6 @@ Design decisions:
 """
 
 import logging
-import os
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -40,7 +39,12 @@ def dataframe_to_parquet_local(
         Absolute local path of the written file.
     """
     local_dir = local_dir or config.local_data_dir
-    partition_dir = Path(local_dir) / "curated" / "stock_prices" / f"date={execution_date.isoformat()}"
+    partition_dir = (
+        Path(local_dir)
+        / "curated"
+        / "stock_prices"
+        / f"date={execution_date.isoformat()}"
+    )
     partition_dir.mkdir(parents=True, exist_ok=True)
 
     file_path = partition_dir / "data.parquet"
@@ -53,7 +57,9 @@ def dataframe_to_parquet_local(
     )
 
     file_size_kb = file_path.stat().st_size / 1024
-    logger.info("Written Parquet file: %s (%.1f KB, %d rows)", file_path, file_size_kb, len(df))
+    logger.info(
+        "Written Parquet file: %s (%.1f KB, %d rows)", file_path, file_size_kb, len(df)
+    )
 
     return str(file_path)
 
@@ -164,5 +170,7 @@ def load_raw_to_dataframe(symbol: str, execution_date: date) -> pd.DataFrame:
     date_str = execution_date.isoformat()
     df = df[df["date"] == date_str].copy()
 
-    logger.info("Loaded %d rows from raw GCS for symbol=%s date=%s", len(df), symbol, date_str)
+    logger.info(
+        "Loaded %d rows from raw GCS for symbol=%s date=%s", len(df), symbol, date_str
+    )
     return df

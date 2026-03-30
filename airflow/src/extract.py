@@ -53,7 +53,9 @@ def fetch_daily_adjusted(
         RuntimeError: If the API returns an error message or rate-limit notice.
         requests.HTTPError: On non-200 HTTP responses.
     """
-    logger.info("Fetching Alpha Vantage data for symbol=%s output_size=%s", symbol, output_size)
+    logger.info(
+        "Fetching Alpha Vantage data for symbol=%s output_size=%s", symbol, output_size
+    )
 
     params = {
         "function": "TIME_SERIES_DAILY",
@@ -74,7 +76,9 @@ def fetch_daily_adjusted(
 
     # Alpha Vantage embeds errors inside a 200 response body
     if "Error Message" in payload:
-        raise RuntimeError(f"Alpha Vantage error for {symbol}: {payload['Error Message']}")
+        raise RuntimeError(
+            f"Alpha Vantage error for {symbol}: {payload['Error Message']}"
+        )
 
     if "Note" in payload:
         # Free-tier rate-limit warning
@@ -111,7 +115,13 @@ def fetch_daily_adjusted(
     df = _cast_schema(df)
     df = df.sort_values("date").reset_index(drop=True)
 
-    logger.info("Parsed %d rows for %s (date range: %s – %s)", len(df), symbol, df["date"].min(), df["date"].max())
+    logger.info(
+        "Parsed %d rows for %s (date range: %s – %s)",
+        len(df),
+        symbol,
+        df["date"].min(),
+        df["date"].max(),
+    )
     return df
 
 
@@ -132,7 +142,10 @@ def fetch_all_symbols(execution_date: Optional[date] = None) -> pd.DataFrame:
 
     for i, symbol in enumerate(config.symbols):
         if i > 0:
-            logger.info("Sleeping %ss between API calls (rate-limit protection)", config.api_sleep_seconds)
+            logger.info(
+                "Sleeping %ss between API calls (rate-limit protection)",
+                config.api_sleep_seconds,
+            )
             time.sleep(config.api_sleep_seconds)
 
         df = fetch_daily_adjusted(symbol, output_size="compact")
@@ -143,7 +156,9 @@ def fetch_all_symbols(execution_date: Optional[date] = None) -> pd.DataFrame:
     if execution_date is not None:
         date_str = execution_date.isoformat()
         combined = combined[combined["date"] == date_str].copy()
-        logger.info("Filtered to execution_date=%s — %d rows remain", date_str, len(combined))
+        logger.info(
+            "Filtered to execution_date=%s — %d rows remain", date_str, len(combined)
+        )
 
         if combined.empty:
             logger.warning(
@@ -158,6 +173,7 @@ def fetch_all_symbols(execution_date: Optional[date] = None) -> pd.DataFrame:
 # ------------------------------------------------------------------------------
 # Internal helpers
 # ------------------------------------------------------------------------------
+
 
 def _cast_schema(df: pd.DataFrame) -> pd.DataFrame:
     """Cast columns to their canonical types."""
