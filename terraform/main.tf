@@ -12,6 +12,17 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  # Remote state on GCS — keeps tfstate (which contains the SA private key)
+  # off local disk and enables state locking to prevent concurrent applies.
+  # The bucket must exist before `terraform init` (bootstrapped on first run).
+  # Comment this block out on first run if the bucket doesn't exist yet,
+  # then uncomment and run `terraform init -migrate-state` after apply.
+  #
+  # backend "gcs" {
+  #   bucket = "market-intelligence-project-market-data-lake"
+  #   prefix = "terraform/state"
+  # }
 }
 
 provider "google" {
@@ -50,8 +61,8 @@ resource "google_project_iam_member" "pipeline_sa_roles" {
 resource "google_service_account_key" "pipeline_sa_key" {
   service_account_id = google_service_account.pipeline_sa.name
   keepers = {
-    # Rotate key by changing this value
-    rotation = "2025-01"
+    # Rotate key by changing this value (format: YYYY-MM)
+    rotation = "2026-03"
   }
 }
 
@@ -72,9 +83,14 @@ resource "google_storage_bucket" "data_lake" {
   storage_class               = "STANDARD"
   uniform_bucket_level_access = true
   force_destroy               = false  # Protect production data
+  public_access_prevention    = "enforced"  # Block all public access — no ACLs, no allUsers
 
   versioning {
     enabled = true
+  }
+
+  lifecycle {
+    prevent_destroy = true  # Terraform will refuse to delete this bucket
   }
 
   lifecycle_rule {
@@ -102,6 +118,17 @@ resource "google_storage_bucket" "data_lake" {
     environment = var.environment
     managed_by  = "terraform"
   }
+}
+
+# Explicitly deny public access at the IAM level (belt-and-suspenders)
+# uniform_bucket_level_access + public_access_prevention="enforced" already
+# blocks allUsers/allAuthenticatedUsers, but this makes the intent explicit.
+resource "google_storage_bucket_iam_binding" "data_lake_only_sa" {
+  bucket = google_storage_bucket.data_lake.name
+  role   = "roles/storage.objectAdmin"
+  members = [
+    "serviceAccount:${google_service_account.pipeline_sa.email}",
+  ]
 }
 
 # Pre-create the logical "folder" prefixes (GCS is flat but these aid clarity)
@@ -143,6 +170,10 @@ resource "google_bigquery_dataset" "market_analytics" {
     project     = "market-intelligence"
     environment = var.environment
     managed_by  = "terraform"
+  }
+
+  lifecycle {
+    prevent_destroy = true  # Prevent accidental dataset deletion via Terraform
   }
 
   access {
