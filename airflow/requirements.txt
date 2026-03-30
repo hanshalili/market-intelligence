@@ -17,3 +17,7 @@ pandas==2.2.2
 # dbt (BigQuery adapter)
 dbt-core==1.7.14
 dbt-bigquery==1.7.9
+
+# Code quality — used by `make lint` via docker compose exec
+flake8==7.0.0
+black==24.4.2

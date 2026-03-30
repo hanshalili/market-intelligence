@@ -49,9 +49,9 @@
 | Alpha Vantage API | Free tier | Daily OHLCV data for equities; free tier covers 25 requests/day — enough for 3 symbols with 15 s sleep between calls |
 | Google Cloud Storage | N/A | Durable object storage; acts as raw and curated data lake; Hive-style partition paths enable downstream pruning |
 | Google BigQuery | N/A | Serverless columnar warehouse; native Parquet ingestion; date partitioning + symbol clustering reduce query cost by 90%+ |
-| dbt | 1.7 | Version-controlled SQL transformations; built-in test framework; lineage graph; `--full-refresh` ensures the mart is always current |
+| dbt | 1.7 | Version-controlled SQL transformations; built-in test framework; lineage graph; runs inside the Airflow scheduler container — no host install |
 | Terraform | >= 1.5 | Reproducible, version-controlled GCP infrastructure (bucket, dataset, IAM, service account key) |
-| Python | 3.11 | Pipeline logic; pandas for DataFrame operations; pyarrow for Parquet serialisation |
+| Python | 3.11 | Pipeline logic; pandas for DataFrame operations; pyarrow for Parquet serialisation; runs inside Docker |
 | Plotly | 5.x | Open-source Python library; generates a fully self-contained interactive HTML file; no account, license, or server required |
 
 ---
@@ -384,13 +384,16 @@ Tests are defined in `dbt/models/staging/schema.yml` and `dbt/models/marts/schem
 
 ### Prerequisites
 
-| Tool | Version | Install |
-|---|---|---|
-| Python | 3.11+ | [python.org](https://python.org) |
-| Docker Desktop | Latest | [docker.com](https://www.docker.com) |
-| Terraform | >= 1.5 | [terraform.io](https://terraform.io) |
-| gcloud CLI | Latest | [cloud.google.com/sdk](https://cloud.google.com/sdk) |
-| Alpha Vantage API key | Free | [alphavantage.co](https://www.alphavantage.co/support/#api-key) |
+Docker handles Python, dbt, flake8, black, dashboard dependencies, and Fernet key generation. The only tools required on the host machine are:
+
+| Tool | Version | Install | Used for |
+|---|---|---|---|
+| Docker Desktop | Latest | [docker.com](https://www.docker.com) | Everything — Airflow, dbt, lint, dashboard |
+| Terraform | >= 1.5 | [terraform.io](https://terraform.io) | GCP infrastructure provisioning |
+| gcloud CLI | Latest | [cloud.google.com/sdk](https://cloud.google.com/sdk) | GCP authentication (`gcloud auth login`) |
+| Alpha Vantage API key | Free | [alphavantage.co](https://www.alphavantage.co/support/#api-key) | Market data source |
+
+> **No `pip install` required** — except `pip install pytest pandas requests` if you want to run `make test` locally. All other tooling (dbt, flake8, black, dashboard packages) runs inside Docker containers.
 
 ### Step 1 — Clone the repository
 
@@ -466,22 +469,17 @@ After `tf-apply` completes, the terminal prints the bucket name, dataset ID, and
 
 Terraform also writes the service account JSON key to `airflow/credentials/service_account.json` (gitignored).
 
-### Step 6 — Install host-machine Python dependencies
+### Step 6 — Install host-machine Python dependencies (optional)
+
+Only needed if you want to run `make test` locally:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt   # installs: pytest, pandas, requests
 ```
 
-This installs dbt-bigquery, pytest, flake8, black, cryptography, and python-dotenv on your local machine. The Airflow container has its own separate `airflow/requirements.txt`.
+Everything else — dbt, flake8, black, dashboard packages, Fernet key generation — runs inside Docker. No other `pip install` is required.
 
-### Step 7 — Install dbt packages
-
-```bash
-# Installs dbt_utils==1.3.3 from packages.yml into dbt/dbt_packages/
-make dbt-deps
-```
-
-### Step 8 — Initialise and start Airflow
+### Step 7 — Initialise and start Airflow
 
 ```bash
 # First time only: creates the Airflow database and admin user
@@ -494,7 +492,7 @@ make airflow-up
 open http://localhost:8080
 ```
 
-Docker Compose starts four services: `postgres` (metadata DB), `airflow-init` (one-shot setup), `webserver` (UI on port 8080), and `scheduler` (DAG runner). The webserver and scheduler each install `airflow/requirements.txt` at startup.
+Docker Compose starts four services: `postgres` (metadata DB), `airflow-init` (one-shot setup), `webserver` (UI on port 8080), and `scheduler` (DAG runner). The webserver and scheduler each install `airflow/requirements.txt` at startup — this includes dbt, flake8, and black, so no host installation is needed.
 
 ---
 
@@ -521,14 +519,15 @@ make pipeline-status
 make airflow-logs
 ```
 
-### Option C — Run dbt standalone
+### Option C — Run dbt standalone (requires Airflow running)
 
-After data is already in BigQuery (e.g. from a previous Airflow run):
+dbt runs inside the scheduler container, so `make airflow-up` must be running first:
 
 ```bash
-make dbt-run    # Run all dbt models
-make dbt-test   # Run all data quality tests
-make dbt-docs   # Serve interactive docs at http://localhost:8081
+make dbt-deps   # Install dbt_utils package inside the scheduler container
+make dbt-run    # Run all dbt models inside the scheduler container
+make dbt-test   # Run dbt data quality tests inside the scheduler container
+make dbt-docs   # Generate docs in container, serve at http://localhost:8081
 ```
 
 ### Option D — Generate the dashboard locally

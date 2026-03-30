@@ -1,30 +1,16 @@
 # ==============================================================================
-# requirements.txt — Host machine / CI environment dependencies
+# requirements.txt — Host machine dependencies (minimal)
 #
-# For running scripts locally (outside Docker), linting, and Terraform.
-# The Airflow container has its own requirements at airflow/requirements.txt.
+# Everything else runs inside Docker containers:
+#   - dbt          → scheduler container (make dbt-run / dbt-test / dbt-docs)
+#   - flake8/black → scheduler container (make lint)
+#   - dashboard    → dedicated dashboard container (make dashboard)
+#   - Fernet key   → python:3.11-slim container (make airflow-fernet)
+#
+# Only `make test` runs locally, requiring the three packages below.
+# Install with: pip install -r requirements.txt
 # ==============================================================================
 
-# GCP
-google-cloud-storage==2.16.0
-google-cloud-bigquery==3.20.1
-google-cloud-bigquery-storage==2.25.0
-pyarrow==15.0.2
-db-dtypes==1.2.0
-
-# HTTP
-requests==2.31.0
-
-# Data processing
-pandas==2.2.2
-
-# dbt
-dbt-core==1.7.14
-dbt-bigquery==1.7.9
-
-# Dev / CI
-python-dotenv==1.0.1
 pytest==8.1.1
-flake8==7.0.0
-black==24.4.2
-cryptography>=42.0.0
+pandas==2.2.2
+requests==2.31.0

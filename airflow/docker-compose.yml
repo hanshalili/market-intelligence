@@ -44,6 +44,7 @@ x-airflow-common: &airflow-common
     - ./dags:/opt/airflow/dags
     - ./src:/opt/airflow/src
     - ../dbt:/opt/airflow/dbt
+    - ../tests:/opt/airflow/tests
     - ./credentials:/opt/airflow/credentials:ro
     - ./requirements.txt:/opt/airflow/requirements.txt:ro
     - airflow-logs:/opt/airflow/logs
@@ -95,6 +96,7 @@ services:
       - ./dags:/opt/airflow/dags
       - ./src:/opt/airflow/src
       - ../dbt:/opt/airflow/dbt
+      - ../tests:/opt/airflow/tests
       - ./credentials:/opt/airflow/credentials:ro
       - ./requirements.txt:/opt/airflow/requirements.txt:ro
       - airflow-logs:/opt/airflow/logs

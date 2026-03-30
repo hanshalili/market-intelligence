@@ -1,8 +1,13 @@
 # ==============================================================================
 # Makefile — Apple & Tesla Market Intelligence Pipeline
 #
-# All commands are documented. Run `make help` to see the full list.
-# Prerequisites: Docker, Docker Compose, Terraform >= 1.5, gcloud CLI
+# Prerequisites (host machine only):
+#   - Docker Desktop (running)
+#   - Terraform >= 1.5
+#   - gcloud CLI (for GCP authentication)
+#
+# Everything else — Python, dbt, flake8, black, dashboard deps — runs inside
+# Docker containers. No pip install required on the host.
 # ==============================================================================
 
 .PHONY: help setup env-check \
@@ -20,6 +25,7 @@ ENV_FILE     := $(PROJECT_DIR)/.env
 AIRFLOW_DIR  := $(PROJECT_DIR)/airflow
 TF_DIR       := $(PROJECT_DIR)/terraform
 DBT_DIR      := $(PROJECT_DIR)/dbt
+COMPOSE      := docker compose --env-file $(ENV_FILE) -f $(AIRFLOW_DIR)/docker-compose.yml
 
 # Load .env if it exists (so make targets can use env vars)
 ifneq (,$(wildcard $(ENV_FILE)))
@@ -32,6 +38,8 @@ help: ## Show this help message
 	@echo ""
 	@echo "  Apple & Tesla Market Intelligence Pipeline"
 	@echo "  ══════════════════════════════════════════"
+	@echo "  Prerequisites: Docker (running), Terraform >= 1.5, gcloud CLI"
+	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 	    | sort \
 	    | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2}'
@@ -90,8 +98,10 @@ tf-destroy: ## ⚠️  Destroy ALL GCP infrastructure (irreversible)
 	fi
 
 # ── Airflow ───────────────────────────────────────────────────────────────────
-airflow-fernet: ## Generate a Fernet key and add it to .env
-	@FERNET=$$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"); \
+airflow-fernet: ## Generate a Fernet key and add it to .env (uses Docker — no host Python needed)
+	@echo "→ Generating Fernet key via Docker..."
+	@FERNET=$$(docker run --rm python:3.11-slim python -c \
+	    "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"); \
 	if grep -q "^AIRFLOW_FERNET_KEY=" $(ENV_FILE) 2>/dev/null; then \
 	    sed -i.bak "s|^AIRFLOW_FERNET_KEY=.*|AIRFLOW_FERNET_KEY=$$FERNET|" $(ENV_FILE); \
 	else \
@@ -101,68 +111,87 @@ airflow-fernet: ## Generate a Fernet key and add it to .env
 
 airflow-init: ## Initialise Airflow DB and create admin user (run once)
 	@echo "→ Initialising Airflow..."
-	@cd $(AIRFLOW_DIR) && \
-	    AIRFLOW_UID=$$(id -u) docker compose --env-file $(ENV_FILE) up airflow-init --exit-code-from airflow-init
+	@AIRFLOW_UID=$$(id -u) $(COMPOSE) up airflow-init --exit-code-from airflow-init
 	@echo "✅ Airflow initialised. Login: admin / admin"
 
 airflow-up: ## Start Airflow services (webserver + scheduler)
 	@echo "→ Starting Airflow..."
-	@cd $(AIRFLOW_DIR) && \
-	    AIRFLOW_UID=$$(id -u) docker compose --env-file $(ENV_FILE) up webserver scheduler -d
+	@AIRFLOW_UID=$$(id -u) $(COMPOSE) up webserver scheduler -d
 	@echo "✅ Airflow UI: http://localhost:8080  (admin / admin)"
 
 airflow-down: ## Stop all Airflow services
-	@cd $(AIRFLOW_DIR) && docker compose --env-file $(ENV_FILE) down
+	@$(COMPOSE) down
 
 airflow-logs: ## Tail Airflow scheduler logs
-	@cd $(AIRFLOW_DIR) && docker compose --env-file $(ENV_FILE) logs -f scheduler
+	@$(COMPOSE) logs -f scheduler
 
-# ── dbt ───────────────────────────────────────────────────────────────────────
-dbt-deps: ## Install dbt packages (dbt_utils)
-	@cd $(DBT_DIR) && dbt deps --profiles-dir $(DBT_DIR)
+# ── dbt — runs inside the scheduler container (no local dbt install needed) ───
+#
+# Requirements: Airflow must be running (`make airflow-up` first).
+# dbt is installed in the scheduler container via airflow/requirements.txt.
+# The dbt/ directory is mounted at /opt/airflow/dbt inside the container.
+# ─────────────────────────────────────────────────────────────────────────────
+dbt-deps: ## Install dbt packages inside the running scheduler container
+	@$(COMPOSE) exec scheduler \
+	    dbt deps --profiles-dir /opt/airflow/dbt --project-dir /opt/airflow/dbt
 
-dbt-run: ## Run dbt models (produces mart_daily_metrics)
-	@cd $(DBT_DIR) && dbt run \
-	    --profiles-dir $(DBT_DIR) \
-	    --project-dir $(DBT_DIR)
+dbt-run: ## Run dbt models inside the running scheduler container
+	@$(COMPOSE) exec scheduler \
+	    dbt run \
+	    --profiles-dir /opt/airflow/dbt \
+	    --project-dir /opt/airflow/dbt
 
-dbt-test: ## Run dbt data quality tests
-	@cd $(DBT_DIR) && dbt test \
-	    --profiles-dir $(DBT_DIR) \
-	    --project-dir $(DBT_DIR)
+dbt-test: ## Run dbt data quality tests inside the running scheduler container
+	@$(COMPOSE) exec scheduler \
+	    dbt test \
+	    --profiles-dir /opt/airflow/dbt \
+	    --project-dir /opt/airflow/dbt
 
-dbt-docs: ## Generate and serve dbt docs at http://localhost:8081
-	@cd $(DBT_DIR) && dbt docs generate \
-	    --profiles-dir $(DBT_DIR) \
-	    --project-dir $(DBT_DIR)
-	@cd $(DBT_DIR) && dbt docs serve --port 8081
+dbt-docs: ## Generate dbt docs (in container) and serve at http://localhost:8081 (on host)
+	@echo "→ Generating dbt docs inside scheduler container..."
+	@$(COMPOSE) exec scheduler \
+	    dbt docs generate \
+	    --profiles-dir /opt/airflow/dbt \
+	    --project-dir /opt/airflow/dbt
+	@echo "✅ Docs generated. Serving at http://localhost:8081 (Ctrl+C to stop)"
+	@cd $(DBT_DIR)/target && python3 -m http.server 8081
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
 pipeline-trigger: ## Trigger the daily_market_pipeline DAG for today
-	@cd $(AIRFLOW_DIR) && \
-	    docker compose --env-file $(ENV_FILE) exec webserver \
-	        airflow dags trigger daily_market_pipeline \
-	        --exec-date "$$(date -u +%Y-%m-%dT%H:%M:%S)"
+	@$(COMPOSE) exec webserver \
+	    airflow dags trigger daily_market_pipeline \
+	    --exec-date "$$(date -u +%Y-%m-%dT%H:%M:%S)"
 	@echo "✅ Pipeline triggered. Monitor at http://localhost:8080"
 
 pipeline-status: ## Show the last 5 DAG runs
-	@cd $(AIRFLOW_DIR) && \
-	    docker compose --env-file $(ENV_FILE) exec webserver \
-	        airflow dags list-runs -d daily_market_pipeline --limit 5
+	@$(COMPOSE) exec webserver \
+	    airflow dags list-runs -d daily_market_pipeline --limit 5
+
+# ── Dashboard — runs in a dedicated Docker container ──────────────────────────
+dashboard: ## Build and run the dashboard container → writes dashboard/dashboard.html
+	@echo "→ Building dashboard image..."
+	@docker build -q -t market-pipeline-dashboard $(PROJECT_DIR)/dashboard
+	@echo "→ Generating dashboard (queries BigQuery)..."
+	@docker run --rm \
+	    --env-file $(ENV_FILE) \
+	    -e GOOGLE_APPLICATION_CREDENTIALS=/credentials/service_account.json \
+	    -v $(AIRFLOW_DIR)/credentials:/credentials:ro \
+	    -v $(PROJECT_DIR)/dashboard:/app \
+	    -v $(PROJECT_DIR)/screenshots:/screenshots \
+	    market-pipeline-dashboard
+	@echo "✅ Dashboard ready."
+	@open $(PROJECT_DIR)/dashboard/dashboard.html
 
 # ── Quality ───────────────────────────────────────────────────────────────────
-dashboard: ## Generate interactive Plotly dashboard → dashboard/dashboard.html
-	@pip install -q -r dashboard/requirements.txt
-	@python dashboard/generate_dashboard.py
-	@open dashboard/dashboard.html
-
-lint: ## Run flake8 and black check on Python source files
+lint: ## Run flake8 and black inside the running scheduler container
 	@echo "→ Running flake8..."
-	@flake8 airflow/src/ airflow/dags/ --max-line-length=120
+	@$(COMPOSE) exec scheduler \
+	    flake8 /opt/airflow/src/ /opt/airflow/dags/ --max-line-length=120
 	@echo "→ Running black check..."
-	@black --check airflow/src/ airflow/dags/
+	@$(COMPOSE) exec scheduler \
+	    black --check /opt/airflow/src/ /opt/airflow/dags/
 
-test: ## Run unit tests
+test: ## Run unit tests (uses local Python — only needs pytest, pandas, requests)
 	@pytest tests/ -v
 
 # ── Housekeeping ──────────────────────────────────────────────────────────────
