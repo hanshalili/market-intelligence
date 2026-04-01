@@ -3,10 +3,10 @@ version: 2
 models:
   - name: mart_daily_metrics
     description: >
-      Analytics mart table: daily financial metrics for AAPL, TSLA, and SPY.
+      Analytics mart table: daily financial metrics for NVDA, AAPL, GOOGL, TSLA, and VOO.
       Partitioned by date, clustered by symbol.
       Produced by dbt transformations from the stg_stock_prices staging view.
-      Consumed by the Plotly dashboard.
+      Consumed by the dashboard.
 
     # Model-level tests — uniqueness constraint across two columns
     tests:
@@ -22,11 +22,14 @@ models:
           - not_null
 
       - name: symbol
-        description: "Ticker symbol: AAPL, TSLA, or SPY (cluster key)."
+        description: "Ticker symbol: NVDA, AAPL, GOOGL, TSLA, or VOO (cluster key)."
         tests:
           - not_null
           - accepted_values:
-              values: ["AAPL", "TSLA", "SPY"]
+              values: ["NVDA", "AAPL", "GOOGL", "TSLA", "VOO"]
+
+      - name: open
+        description: "Opening price for the trading day."
 
       - name: adjusted_close
         description: "Dividend and split adjusted closing price."
@@ -58,11 +61,11 @@ models:
         tests:
           - assert_drawdown_non_positive
 
-      - name: spy_daily_return
-        description: "SPY daily return on the same trading date (benchmark)."
+      - name: voo_daily_return
+        description: "VOO daily return on the same trading date (benchmark)."
 
-      - name: excess_return_vs_spy
-        description: "Stock daily_return minus SPY daily_return (alpha proxy)."
+      - name: excess_return_vs_voo
+        description: "Stock daily_return minus VOO daily_return (alpha proxy)."
 
       - name: transformed_at
         description: "UTC timestamp when dbt produced this row."

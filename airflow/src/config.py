@@ -19,7 +19,7 @@ class PipelineConfig:
     alpha_vantage_base_url: str = "https://www.alphavantage.co/query"
 
     # Symbols to ingest
-    symbols: List[str] = field(default_factory=lambda: ["AAPL", "TSLA", "SPY"])
+    symbols: List[str] = field(default_factory=lambda: ["NVDA", "AAPL", "GOOGL", "TSLA", "VOO"])
 
     # GCP
     gcp_project_id: str = field(default_factory=lambda: _require_env("GCP_PROJECT_ID"))

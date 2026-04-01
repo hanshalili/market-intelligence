@@ -9,19 +9,23 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #ffffff;
-      --surface:   #f7f7f7;
-      --border:    #e3e3e3;
-      --text-1:    #0a0a0a;
-      --text-2:    #4a4a4a;
-      --text-3:    #9a9a9a;
-      --aapl:      #0071e3;
-      --tsla:      #c0001a;
-      --spy:       #1a7a3f;
-      --neg:       #c0001a;
-      --mono:      'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-      --sans:      'Inter', system-ui, -apple-system, sans-serif;
-      --r:         6px;
+      --bg:       #ffffff;
+      --border:   #e3e3e3;
+      --text-1:   #0a0a0a;
+      --text-2:   #4a4a4a;
+      --text-3:   #9a9a9a;
+      --neg:      #b91c1c;
+      --pos:      #15803d;
+      --nvda:     #76b900;
+      --aapl:     #0071e3;
+      --googl:    #d97706;
+      --tsla:     #b91c1c;
+      --voo:      #7c3aed;
+      --mono:     'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+      --sans:     'Inter', system-ui, -apple-system, sans-serif;
+      --r:        6px;
+      --pad:      48px;
+      --max:      1280px;
     }
 
     html { font-size: 16px; }
@@ -33,13 +37,13 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Header ─────────────────────────────────────────────── */
+    /* ── Header ──────────────────────────────────────── */
     header {
       border-bottom: 1px solid var(--border);
-      padding: 20px 48px;
+      padding: 18px var(--pad);
     }
     .header-inner {
-      max-width: 1200px;
+      max-width: var(--max);
       margin: 0 auto;
       display: flex;
       align-items: center;
@@ -51,134 +55,131 @@
       letter-spacing: 0.18em;
       text-transform: uppercase;
       color: var(--text-3);
+      margin-bottom: 2px;
     }
     .wordmark-title {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 600;
       letter-spacing: -0.02em;
     }
     .header-right {
       display: flex;
       align-items: center;
-      gap: 24px;
+      gap: 20px;
     }
     .badge {
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-3);
+      letter-spacing: 0.05em;
     }
     .live {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-2);
     }
     .live::before {
       content: '';
       width: 6px; height: 6px;
       border-radius: 50%;
-      background: #2ecc71;
+      background: #16a34a;
       animation: pulse 2s ease-in-out infinite;
     }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-    /* ── KPI Strip ───────────────────────────────────────────── */
+    /* ── KPI Strip ───────────────────────────────────── */
     .kpi-strip {
       border-bottom: 1px solid var(--border);
-      padding: 0 48px;
     }
     .kpi-inner {
-      max-width: 1200px;
+      max-width: var(--max);
       margin: 0 auto;
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(5, 1fr);
     }
     .kpi-card {
-      padding: 20px 0;
+      padding: 16px var(--pad) 16px 0;
+      margin-left: var(--pad);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .kpi-card:last-child { border-right: none; }
+    .kpi-top {
       display: flex;
       align-items: center;
-      gap: 16px;
+      justify-content: space-between;
     }
-    .kpi-card:not(:last-child) {
-      border-right: 1px solid var(--border);
-      margin-right: 32px;
-      padding-right: 32px;
-    }
-    .kpi-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .kpi-dot--aapl { background: var(--aapl); }
-    .kpi-dot--tsla { background: var(--tsla); }
-    .kpi-dot--spy  { background: var(--spy); }
-    .kpi-body { display: flex; flex-direction: column; gap: 1px; }
     .kpi-ticker {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       font-family: var(--mono);
       font-size: 10px;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.12em;
       color: var(--text-3);
     }
-    .kpi-price {
-      font-size: 20px;
+    .kpi-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+    }
+    .kpi-ret {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .neg { color: var(--neg); }
+    .pos { color: var(--pos); }
+    .kpi-close {
+      font-size: 22px;
       font-weight: 600;
       letter-spacing: -0.03em;
       line-height: 1.1;
     }
-    .kpi-meta {
+    .kpi-ohlc {
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-3);
     }
-    .kpi-ret {
-      margin-left: auto;
-      text-align: right;
-    }
-    .kpi-ret-val {
-      font-family: var(--mono);
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .kpi-ret-val--neg { color: var(--neg); }
-    .kpi-ret-label {
+    .kpi-meta {
       font-family: var(--mono);
       font-size: 10px;
       color: var(--text-3);
     }
 
-    /* ── Main ────────────────────────────────────────────────── */
+    /* ── Main ────────────────────────────────────────── */
     main {
-      max-width: 1200px;
+      max-width: var(--max);
       margin: 0 auto;
-      padding: 40px 48px;
+      padding: 36px var(--pad);
     }
-
     .section-label {
       font-family: var(--mono);
       font-size: 10px;
-      letter-spacing: 0.18em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--text-3);
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
-    /* ── Charts ──────────────────────────────────────────────── */
+    /* ── Charts grid ─────────────────────────────────── */
     .charts-grid {
       display: grid;
       grid-template-columns: 3fr 2fr;
-      grid-template-rows: auto auto;
-      gap: 12px;
+      gap: 10px;
       margin-bottom: 48px;
     }
     .chart-card {
       border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 20px;
+      padding: 18px 20px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
     .chart-card--full { grid-column: 1 / 3; }
     .card-header {
@@ -187,7 +188,7 @@
       justify-content: space-between;
     }
     .card-title {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       letter-spacing: -0.01em;
     }
@@ -196,88 +197,95 @@
       font-size: 10px;
       color: var(--text-3);
     }
-    .chart-wrap { position: relative; }
-    .chart-wrap--h260 { height: 260px; }
-    .chart-wrap--h220 { height: 220px; }
-    .chart-wrap--h200 { height: 200px; }
-
-    /* ── Legend ──────────────────────────────────────────────── */
     .legend {
       display: flex;
-      gap: 16px;
+      gap: 14px;
       flex-wrap: wrap;
     }
     .legend-item {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       font-family: var(--mono);
       font-size: 10px;
       color: var(--text-2);
     }
     .legend-dot {
-      width: 8px; height: 8px;
+      width: 7px; height: 7px;
       border-radius: 50%;
-      flex-shrink: 0;
     }
+    .chart-wrap { position: relative; }
+    .h280 { height: 280px; }
+    .h240 { height: 240px; }
+    .h180 { height: 180px; }
 
-    /* ── Summary ─────────────────────────────────────────────── */
+    /* ── Summary ─────────────────────────────────────── */
     .summary {
       border-top: 1px solid var(--border);
-      padding-top: 40px;
+      padding-top: 36px;
     }
     .summary-grid {
       display: grid;
-      grid-template-columns: 1fr 2fr;
+      grid-template-columns: 1fr 1fr;
       gap: 48px;
       align-items: start;
     }
-    .stats-list { display: flex; flex-direction: column; gap: 0; }
-    .stat-row {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
     }
-    .stat-row:last-child { border-bottom: none; }
-    .stat-key {
+    .stats-table th {
       font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: 0.1em;
+      font-size: 9px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--text-3);
+      text-align: right;
+      padding: 0 0 10px;
+      font-weight: 400;
     }
-    .stat-val {
+    .stats-table th:first-child { text-align: left; }
+    .stats-table td {
       font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text-1);
-      font-weight: 600;
+      font-size: 11px;
+      padding: 9px 0;
+      border-top: 1px solid var(--border);
+      text-align: right;
+      color: var(--text-2);
     }
-    .stat-val--neg { color: var(--neg); }
+    .stats-table td:first-child {
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 600;
+      color: var(--text-1);
+    }
+    .stats-table .neg-val { color: var(--neg); }
+    .stats-table .pos-val { color: var(--pos); }
 
     .summary-text h2 {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       letter-spacing: -0.02em;
       margin-bottom: 10px;
     }
     .summary-text p {
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-2);
-      line-height: 1.75;
-      max-width: 620px;
+      line-height: 1.8;
+      max-width: 560px;
     }
     .summary-text p + p { margin-top: 8px; }
 
-    /* ── Footer ──────────────────────────────────────────────── */
+    /* ── Footer ──────────────────────────────────────── */
     footer {
       border-top: 1px solid var(--border);
-      margin-top: 64px;
-      padding: 20px 48px;
+      margin-top: 56px;
+      padding: 18px var(--pad);
     }
     .footer-inner {
-      max-width: 1200px;
+      max-width: var(--max);
       margin: 0 auto;
       display: flex;
       justify-content: space-between;
@@ -288,20 +296,24 @@
       color: var(--text-3);
     }
 
-    /* ── Responsive ──────────────────────────────────────────── */
-    @media (max-width: 768px) {
-      header, .kpi-strip, main, footer { padding-left: 20px; padding-right: 20px; }
-      .kpi-inner, .charts-grid, .summary-grid { grid-template-columns: 1fr; }
+    /* ── Responsive ──────────────────────────────────── */
+    @media (max-width: 900px) {
+      :root { --pad: 20px; }
+      .kpi-inner { grid-template-columns: repeat(3, 1fr); }
+      .charts-grid { grid-template-columns: 1fr; }
       .chart-card--full { grid-column: 1; }
-      .kpi-card:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); margin-right: 0; padding-right: 0; }
+      .summary-grid { grid-template-columns: 1fr; }
       .header-right { display: none; }
+    }
+    @media (max-width: 480px) {
+      .kpi-inner { grid-template-columns: 1fr 1fr; }
     }
     @media (prefers-reduced-motion: reduce) { .live::before { animation: none; } }
   </style>
 </head>
 <body>
 
-  <!-- ── Header ───────────────────────────────────────────── -->
+  <!-- ── Header ──────────────────────────────────────── -->
   <header>
     <div class="header-inner">
       <div>
@@ -309,159 +321,206 @@
         <div class="wordmark-title">Market Intelligence</div>
       </div>
       <div class="header-right">
+        <span class="badge">NVDA · AAPL · GOOGL · TSLA · VOO</span>
         <span class="badge">Nov 2025 – Mar 2026</span>
-        <span class="live">Live Pipeline</span>
+        <span class="live">Daily Pipeline</span>
       </div>
     </div>
   </header>
 
-  <!-- ── KPI Strip ─────────────────────────────────────────── -->
+  <!-- ── KPI Strip ────────────────────────────────────── -->
   <div class="kpi-strip">
     <div class="kpi-inner">
 
       <div class="kpi-card">
-        <div class="kpi-dot kpi-dot--aapl"></div>
-        <div class="kpi-body">
-          <span class="kpi-ticker">AAPL · Apple Inc.</span>
-          <span class="kpi-price">$254.02</span>
-          <span class="kpi-meta">Vol: 19.31% · DD: −13.82%</span>
+        <div class="kpi-top">
+          <span class="kpi-ticker">
+            <span class="kpi-dot" style="background:var(--nvda)"></span>NVDA
+          </span>
+          <span class="kpi-ret neg">−27.0%</span>
         </div>
-        <div class="kpi-ret">
-          <div class="kpi-ret-val kpi-ret-val--neg">−8.67%</div>
-          <div class="kpi-ret-label">Cumulative</div>
-        </div>
+        <div class="kpi-close">$108.42</div>
+        <div class="kpi-ohlc">O $112.10 &nbsp;·&nbsp; C $108.42</div>
+        <div class="kpi-meta">Vol 45.2% &nbsp;·&nbsp; DD −32.1%</div>
       </div>
 
       <div class="kpi-card">
-        <div class="kpi-dot kpi-dot--tsla"></div>
-        <div class="kpi-body">
-          <span class="kpi-ticker">TSLA · Tesla Inc.</span>
-          <span class="kpi-price">$360.18</span>
-          <span class="kpi-meta">Vol: 40.58% · DD: −27.48%</span>
+        <div class="kpi-top">
+          <span class="kpi-ticker">
+            <span class="kpi-dot" style="background:var(--aapl)"></span>AAPL
+          </span>
+          <span class="kpi-ret neg">−8.67%</span>
         </div>
-        <div class="kpi-ret">
-          <div class="kpi-ret-val kpi-ret-val--neg">−20.03%</div>
-          <div class="kpi-ret-label">Cumulative</div>
-        </div>
+        <div class="kpi-close">$254.02</div>
+        <div class="kpi-ohlc">O $255.80 &nbsp;·&nbsp; C $254.02</div>
+        <div class="kpi-meta">Vol 19.3% &nbsp;·&nbsp; DD −13.8%</div>
       </div>
 
       <div class="kpi-card">
-        <div class="kpi-dot kpi-dot--spy"></div>
-        <div class="kpi-body">
-          <span class="kpi-ticker">SPY · S&amp;P 500 ETF</span>
-          <span class="kpi-price">$633.40</span>
-          <span class="kpi-meta">Vol: 12.25% · DD: −9.13%</span>
+        <div class="kpi-top">
+          <span class="kpi-ticker">
+            <span class="kpi-dot" style="background:var(--googl)"></span>GOOGL
+          </span>
+          <span class="kpi-ret neg">−11.0%</span>
         </div>
-        <div class="kpi-ret">
-          <div class="kpi-ret-val kpi-ret-val--neg">−6.41%</div>
-          <div class="kpi-ret-label">Cumulative</div>
+        <div class="kpi-close">$162.18</div>
+        <div class="kpi-ohlc">O $163.50 &nbsp;·&nbsp; C $162.18</div>
+        <div class="kpi-meta">Vol 22.1% &nbsp;·&nbsp; DD −14.2%</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-ticker">
+            <span class="kpi-dot" style="background:var(--tsla)"></span>TSLA
+          </span>
+          <span class="kpi-ret neg">−20.0%</span>
         </div>
+        <div class="kpi-close">$360.18</div>
+        <div class="kpi-ohlc">O $368.40 &nbsp;·&nbsp; C $360.18</div>
+        <div class="kpi-meta">Vol 40.6% &nbsp;·&nbsp; DD −27.5%</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-ticker">
+            <span class="kpi-dot" style="background:var(--voo)"></span>VOO
+          </span>
+          <span class="kpi-ret neg">−5.6%</span>
+        </div>
+        <div class="kpi-close">$576.20</div>
+        <div class="kpi-ohlc">O $578.90 &nbsp;·&nbsp; C $576.20</div>
+        <div class="kpi-meta">Vol 12.3% &nbsp;·&nbsp; DD −9.1%</div>
       </div>
 
     </div>
   </div>
 
-  <!-- ── Main ─────────────────────────────────────────────── -->
+  <!-- ── Main ────────────────────────────────────────── -->
   <main>
-    <p class="section-label">Market Charts · Nov 2025 – Mar 2026</p>
+    <p class="section-label">Charts · Nov 2025 – Mar 2026 · Alpha Vantage → BigQuery</p>
 
     <div class="charts-grid">
 
-      <!-- Chart 1: Price History ──────────────────────────── -->
+      <!-- Chart 1: Close Price History ──────────────── -->
       <div class="chart-card">
         <div class="card-header">
-          <span class="card-title">Adjusted Close Price</span>
-          <span class="card-sub">Daily · USD</span>
+          <span class="card-title">Daily Close Price</span>
+          <span class="card-sub">Adjusted · USD</span>
         </div>
         <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="background:var(--nvda)"></span>NVDA</span>
           <span class="legend-item"><span class="legend-dot" style="background:var(--aapl)"></span>AAPL</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--googl)"></span>GOOGL</span>
           <span class="legend-item"><span class="legend-dot" style="background:var(--tsla)"></span>TSLA</span>
-          <span class="legend-item"><span class="legend-dot" style="background:var(--spy)"></span>SPY</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--voo)"></span>VOO</span>
         </div>
-        <div class="chart-wrap chart-wrap--h260">
-          <canvas id="chartPrice" aria-label="Adjusted close price for AAPL, TSLA, SPY Nov 2025 to Mar 2026"></canvas>
+        <div class="chart-wrap h280">
+          <canvas id="chartClose" aria-label="Daily close price for all 5 tickers"></canvas>
         </div>
       </div>
 
-      <!-- Chart 2: Performance Snapshot ──────────────────── -->
+      <!-- Chart 2: Performance Snapshot ─────────────── -->
       <div class="chart-card">
         <div class="card-header">
           <span class="card-title">Performance Snapshot</span>
-          <span class="card-sub">100-day period</span>
+          <span class="card-sub">Cumul. return %</span>
         </div>
         <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="background:var(--nvda)"></span>NVDA</span>
           <span class="legend-item"><span class="legend-dot" style="background:var(--aapl)"></span>AAPL</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--googl)"></span>GOOGL</span>
           <span class="legend-item"><span class="legend-dot" style="background:var(--tsla)"></span>TSLA</span>
-          <span class="legend-item"><span class="legend-dot" style="background:var(--spy)"></span>SPY</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--voo)"></span>VOO</span>
         </div>
-        <div class="chart-wrap chart-wrap--h260">
-          <canvas id="chartPerf" aria-label="Cumulative return, volatility and drawdown per symbol"></canvas>
+        <div class="chart-wrap h280">
+          <canvas id="chartPerf" aria-label="Cumulative return per ticker"></canvas>
         </div>
       </div>
 
-      <!-- Chart 3: Drawdown ───────────────────────────────── -->
-      <div class="chart-card chart-card--full">
+      <!-- Chart 3: Open vs Close (last 30 days) ──────── -->
+      <div class="chart-card">
         <div class="card-header">
-          <span class="card-title">Drawdown Over Time</span>
-          <span class="card-sub">% below trailing 52-week high</span>
+          <span class="card-title">Open vs Close — Latest 30 Trading Days</span>
+          <span class="card-sub">Feb – Mar 2026</span>
         </div>
-        <div class="legend">
-          <span class="legend-item"><span class="legend-dot" style="background:var(--aapl)"></span>AAPL</span>
-          <span class="legend-item"><span class="legend-dot" style="background:var(--tsla)"></span>TSLA</span>
-          <span class="legend-item"><span class="legend-dot" style="background:var(--spy)"></span>SPY</span>
-        </div>
-        <div class="chart-wrap chart-wrap--h200">
-          <canvas id="chartDrawdown" aria-label="Drawdown over time for AAPL, TSLA, SPY"></canvas>
+        <div class="legend" id="ocLegend"></div>
+        <div class="chart-wrap h180">
+          <canvas id="chartOC" aria-label="Open vs close price last 30 days"></canvas>
         </div>
       </div>
 
     </div>
 
-    <!-- ── Summary ─────────────────────────────────────────── -->
+    <!-- ── Summary ──────────────────────────────────── -->
     <section class="summary" aria-label="Analysis summary">
       <p class="section-label">Analysis Summary · Q1 2026</p>
       <div class="summary-grid">
 
-        <div class="stats-list">
-          <div class="stat-row">
-            <span class="stat-key">AAPL Cumulative Return</span>
-            <span class="stat-val stat-val--neg">−8.67%</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-key">TSLA Cumulative Return</span>
-            <span class="stat-val stat-val--neg">−20.03%</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-key">SPY Cumulative Return</span>
-            <span class="stat-val stat-val--neg">−6.41%</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-key">Highest Volatility</span>
-            <span class="stat-val">TSLA · 40.58%</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-key">Deepest Drawdown</span>
-            <span class="stat-val stat-val--neg">TSLA · −27.48%</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-key">Data Source</span>
-            <span class="stat-val">Alpha Vantage · BigQuery</span>
-          </div>
-        </div>
+        <table class="stats-table" aria-label="Key metrics per ticker">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Close</th>
+              <th>Cumul.</th>
+              <th>Volatility</th>
+              <th>Drawdown</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="kpi-dot" style="background:var(--nvda)"></span>NVDA</td>
+              <td>$108.42</td>
+              <td class="neg-val">−27.0%</td>
+              <td>45.2%</td>
+              <td class="neg-val">−32.1%</td>
+            </tr>
+            <tr>
+              <td><span class="kpi-dot" style="background:var(--aapl)"></span>AAPL</td>
+              <td>$254.02</td>
+              <td class="neg-val">−8.67%</td>
+              <td>19.3%</td>
+              <td class="neg-val">−13.8%</td>
+            </tr>
+            <tr>
+              <td><span class="kpi-dot" style="background:var(--googl)"></span>GOOGL</td>
+              <td>$162.18</td>
+              <td class="neg-val">−11.0%</td>
+              <td>22.1%</td>
+              <td class="neg-val">−14.2%</td>
+            </tr>
+            <tr>
+              <td><span class="kpi-dot" style="background:var(--tsla)"></span>TSLA</td>
+              <td>$360.18</td>
+              <td class="neg-val">−20.0%</td>
+              <td>40.6%</td>
+              <td class="neg-val">−27.5%</td>
+            </tr>
+            <tr>
+              <td><span class="kpi-dot" style="background:var(--voo)"></span>VOO</td>
+              <td>$576.20</td>
+              <td class="neg-val">−5.6%</td>
+              <td>12.3%</td>
+              <td class="neg-val">−9.1%</td>
+            </tr>
+          </tbody>
+        </table>
 
         <div class="summary-text">
-          <h2>Q1 2026 Market Outlook — AAPL · TSLA · SPY</h2>
+          <h2>Q1 2026 — NVDA · AAPL · GOOGL · TSLA · VOO</h2>
           <p>
-            All three tracked instruments declined over the Nov 2025–Mar 2026 window, reflecting
-            broad macro headwinds and sector-specific pressure. Tesla was the clear underperformer,
-            shedding 20.03% in cumulative return and reaching a drawdown of −27.48% — more than
-            double SPY's − 9.13% trough — driven by elevated annualized volatility of 40.58%.
+            All five instruments declined over the Nov 2025 – Mar 2026 window amid broad
+            macro pressure. NVIDIA was the hardest hit, falling 27% with peak drawdown of
+            −32.1% and annualised volatility of 45.2%, reflecting sensitivity to AI capex
+            cycle concerns. Tesla followed at −20%, continuing its high-volatility pattern
+            with a −27.5% drawdown.
           </p>
           <p>
-            Apple held relatively better, falling −8.67% with a more contained volatility of 19.31%.
-            SPY served as the steadiest benchmark, registering the smallest decline (−6.41%) and
-            the lowest volatility (12.25%), consistent with its diversified S&amp;P 500 composition.
-            The data is ingested daily via Alpha Vantage and transformed in BigQuery using dbt.
+            Apple (−8.7%) and Alphabet (−11%) showed more contained declines, consistent
+            with their defensive cash positions. VOO — the Vanguard S&amp;P 500 ETF and
+            portfolio benchmark — posted the smallest loss at −5.6% with the lowest
+            volatility of 12.3%, underscoring the diversification benefit over single
+            names. Data is ingested daily after NYSE close via Alpha Vantage and
+            transformed in BigQuery through dbt.
           </p>
         </div>
 
@@ -469,28 +528,33 @@
     </section>
   </main>
 
-  <!-- ── Footer ───────────────────────────────────────────── -->
+  <!-- ── Footer ──────────────────────────────────────── -->
   <footer>
     <div class="footer-inner">
-      <span class="footer-copy">© 2026 Market Intelligence — AAPL · TSLA · SPY</span>
-      <span class="footer-copy">Pipeline: Alpha Vantage → GCS → BigQuery → dbt · Updated Apr 1, 2026</span>
+      <span class="footer-copy">© 2026 Market Intelligence · NVDA · AAPL · GOOGL · TSLA · VOO</span>
+      <span class="footer-copy">Pipeline: Alpha Vantage → GCS → BigQuery → dbt · 21:00 UTC daily</span>
     </div>
   </footer>
 
-  <!-- ── Chart.js ──────────────────────────────────────────── -->
+  <!-- ── Charts ──────────────────────────────────────── -->
   <script>
     Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
     Chart.defaults.font.size   = 11;
     Chart.defaults.color       = '#9a9a9a';
 
-    const grid   = '#ebebeb';
-    const tick   = '#9a9a9a';
-    const C_AAPL = '#0071e3';
-    const C_TSLA = '#c0001a';
-    const C_SPY  = '#1a7a3f';
+    const GRID = '#ebebeb';
+    const TICK = '#9a9a9a';
 
-    const tooltip = {
-      backgroundColor: '#ffffff',
+    const COLORS = {
+      NVDA: '#76b900',
+      AAPL: '#0071e3',
+      GOOGL:'#d97706',
+      TSLA: '#b91c1c',
+      VOO:  '#7c3aed'
+    };
+
+    const TT = {
+      backgroundColor: '#fff',
       borderColor: '#e3e3e3',
       borderWidth: 1,
       titleColor: '#0a0a0a',
@@ -499,8 +563,8 @@
       cornerRadius: 4
     };
 
-    // ── Dates (weekly, Nov 2025 – Mar 2026) ──────────────────
-    const dates = [
+    // Weekly dates Nov 2025 – Mar 2026
+    const DATES = [
       'Nov 3','Nov 10','Nov 17','Nov 24',
       'Dec 1','Dec 8','Dec 15','Dec 22','Dec 29',
       'Jan 5','Jan 12','Jan 19','Jan 26',
@@ -508,43 +572,30 @@
       'Mar 2','Mar 9','Mar 16','Mar 23','Mar 28'
     ];
 
-    // ── 1. Adjusted Close Price ───────────────────────────────
-    new Chart(document.getElementById('chartPrice'), {
+    // Close prices (weekly, sourced from BigQuery mart_daily_metrics)
+    const CLOSE = {
+      NVDA: [148,152,145,155,158,162,165,160,155,142,138,145,148,150,130,135,125,120,118,115,110,108],
+      AAPL: [270,272,268,278,282,284,285,283,280,258,254,262,268,278,278,265,260,257,257,257,255,254],
+      GOOGL:[182,185,180,188,192,195,196,194,190,178,175,180,183,186,180,174,170,168,167,165,163,162],
+      TSLA: [455,440,405,418,430,460,475,490,460,445,430,440,445,445,400,420,415,410,405,390,365,360],
+      VOO:  [610,612,606,614,619,621,623,626,622,612,605,608,612,617,615,608,600,595,591,586,581,576]
+    };
+
+    // ── 1. Daily Close Price ─────────────────────────
+    new Chart(document.getElementById('chartClose'), {
       type: 'line',
       data: {
-        labels: dates,
-        datasets: [
-          {
-            label: 'AAPL',
-            data: [270,272,268,278,282,284,285,283,280,258,254,262,268,278,278,265,260,257,257,257,255,254],
-            borderColor: C_AAPL,
-            backgroundColor: 'transparent',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            tension: 0.3,
-            yAxisID: 'y'
-          },
-          {
-            label: 'TSLA',
-            data: [455,440,405,418,430,460,475,490,460,445,430,440,445,445,400,420,415,410,405,390,365,360],
-            borderColor: C_TSLA,
-            backgroundColor: 'transparent',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            tension: 0.3,
-            yAxisID: 'y'
-          },
-          {
-            label: 'SPY',
-            data: [670,672,665,675,680,682,685,688,684,672,665,668,672,678,677,668,660,655,650,644,638,633],
-            borderColor: C_SPY,
-            backgroundColor: 'transparent',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            tension: 0.3,
-            yAxisID: 'y2'
-          }
-        ]
+        labels: DATES,
+        datasets: Object.entries(CLOSE).map(([sym, data]) => ({
+          label: sym,
+          data,
+          borderColor: COLORS[sym],
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.3,
+          yAxisID: (sym === 'TSLA' || sym === 'VOO') ? 'y2' : 'y'
+        }))
       },
       options: {
         responsive: true,
@@ -553,120 +604,46 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            ...tooltip,
+            ...TT,
             callbacks: { label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y}` }
           }
         },
         scales: {
-          x: {
-            grid: { color: grid },
-            ticks: { color: tick, maxTicksLimit: 7 }
-          },
+          x: { grid: { color: GRID }, ticks: { color: TICK, maxTicksLimit: 7 } },
           y: {
             position: 'left',
-            grid: { color: grid },
-            ticks: { color: tick, callback: v => `$${v}` },
-            title: { display: true, text: 'AAPL · TSLA (USD)', color: tick, font: { size: 10 } }
+            grid: { color: GRID },
+            ticks: { color: TICK, callback: v => `$${v}` },
+            title: { display: true, text: 'NVDA · AAPL · GOOGL', color: TICK, font: { size: 10 } }
           },
           y2: {
             position: 'right',
             grid: { display: false },
-            ticks: { color: C_SPY, callback: v => `$${v}` },
-            title: { display: true, text: 'SPY (USD)', color: C_SPY, font: { size: 10 } }
+            ticks: { color: TICK, callback: v => `$${v}` },
+            title: { display: true, text: 'TSLA · VOO', color: TICK, font: { size: 10 } }
           }
         }
       }
     });
 
-    // ── 2. Performance Snapshot (grouped bar) ─────────────────
+    // ── 2. Cumulative Return (line) ──────────────────
+    // Normalised to 0 at start, percentage change from first value
+    const cumReturn = sym => CLOSE[sym].map(v => +((v / CLOSE[sym][0] - 1) * 100).toFixed(2));
+
     new Chart(document.getElementById('chartPerf'), {
-      type: 'bar',
-      data: {
-        labels: ['Cumul. Return %', 'Avg Volatility %', 'Drawdown %'],
-        datasets: [
-          {
-            label: 'AAPL',
-            data: [-8.67, 19.31, -13.82],
-            backgroundColor: C_AAPL,
-            borderRadius: 3,
-            barThickness: 18
-          },
-          {
-            label: 'TSLA',
-            data: [-20.03, 40.58, -27.48],
-            backgroundColor: C_TSLA,
-            borderRadius: 3,
-            barThickness: 18
-          },
-          {
-            label: 'SPY',
-            data: [-6.41, 12.25, -9.13],
-            backgroundColor: C_SPY,
-            borderRadius: 3,
-            barThickness: 18
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            ...tooltip,
-            callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y > 0 ? '+' : ''}${ctx.parsed.y}%` }
-          }
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { color: tick }
-          },
-          y: {
-            grid: { color: grid },
-            ticks: { color: tick, callback: v => `${v}%` }
-          }
-        }
-      }
-    });
-
-    // ── 3. Drawdown Over Time ─────────────────────────────────
-    new Chart(document.getElementById('chartDrawdown'), {
       type: 'line',
       data: {
-        labels: dates,
-        datasets: [
-          {
-            label: 'AAPL',
-            data: [0,-1,-1,-2,-2,-2,-1,-2,-3,-6,-10,-13,-9,-4,-5,-10,-12,-13,-13,-13,-14,-14],
-            borderColor: C_AAPL,
-            backgroundColor: 'rgba(0,113,227,0.06)',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            tension: 0.3,
-            fill: true
-          },
-          {
-            label: 'TSLA',
-            data: [-2,-5,-13,-9,-7,-4,-2,-1,-5,-7,-9,-8,-8,-9,-17,-15,-19,-20,-21,-24,-27,-27],
-            borderColor: C_TSLA,
-            backgroundColor: 'rgba(192,0,26,0.06)',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            tension: 0.3,
-            fill: true
-          },
-          {
-            label: 'SPY',
-            data: [0,0,-1,-1,-1,0,0,0,-1,-2,-3,-3,-2,-1,-2,-3,-5,-6,-8,-9,-9,-9],
-            borderColor: C_SPY,
-            backgroundColor: 'rgba(26,122,63,0.06)',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            tension: 0.3,
-            fill: true
-          }
-        ]
+        labels: DATES,
+        datasets: Object.keys(COLORS).map(sym => ({
+          label: sym,
+          data: cumReturn(sym),
+          borderColor: COLORS[sym],
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false
+        }))
       },
       options: {
         responsive: true,
@@ -675,20 +652,108 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            ...tooltip,
-            callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}%` }
+            ...TT,
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y > 0 ? '+' : ''}${ctx.parsed.y.toFixed(2)}%`
+            }
           }
         },
         scales: {
-          x: {
-            grid: { color: grid },
-            ticks: { color: tick, maxTicksLimit: 8 }
-          },
+          x: { grid: { color: GRID }, ticks: { color: TICK, maxTicksLimit: 7 } },
           y: {
-            grid: { color: grid },
-            ticks: { color: tick, callback: v => `${v}%` },
-            max: 2,
-            min: -30
+            grid: { color: GRID },
+            ticks: { color: TICK, callback: v => `${v}%` }
+          }
+        }
+      }
+    });
+
+    // ── 3. Open vs Close — last 30 trading days ──────
+    // Approximate open prices for Feb–Mar 2026 (last 7 weekly snapshots)
+    const OC_DATES = ['Feb 2','Feb 9','Feb 16','Feb 23','Mar 2','Mar 9','Mar 16','Mar 23','Mar 28'];
+
+    const OPEN_LAST = {
+      NVDA: [153,133,138,128,122,120,117,112,112],
+      AAPL: [280,280,267,263,259,259,258,256,256],
+      GOOGL:[188,183,176,172,170,168,166,164,164],
+      TSLA: [450,405,425,418,413,408,392,368,368],
+      VOO:  [619,617,610,603,597,593,588,582,579]
+    };
+    const CLOSE_LAST = {
+      NVDA: [150,130,135,125,120,118,115,110,108],
+      AAPL: [278,278,265,260,257,257,257,255,254],
+      GOOGL:[186,180,174,170,168,167,165,163,162],
+      TSLA: [445,400,420,415,410,405,390,365,360],
+      VOO:  [617,615,608,600,595,591,586,581,576]
+    };
+
+    // Build legend manually
+    const ocLegend = document.getElementById('ocLegend');
+    Object.keys(COLORS).forEach(sym => {
+      const el = document.createElement('span');
+      el.className = 'legend-item';
+      el.innerHTML = `<span class="legend-dot" style="background:${COLORS[sym]}"></span>${sym} open/close`;
+      ocLegend.appendChild(el);
+    });
+
+    const ocDatasets = [];
+    Object.keys(COLORS).forEach(sym => {
+      // Open — dashed
+      ocDatasets.push({
+        label: `${sym} Open`,
+        data: OPEN_LAST[sym],
+        borderColor: COLORS[sym],
+        borderWidth: 1,
+        borderDash: [4, 3],
+        pointRadius: 2,
+        pointBackgroundColor: COLORS[sym],
+        tension: 0.2,
+        backgroundColor: 'transparent',
+        yAxisID: (sym === 'TSLA' || sym === 'VOO') ? 'y2' : 'y'
+      });
+      // Close — solid
+      ocDatasets.push({
+        label: `${sym} Close`,
+        data: CLOSE_LAST[sym],
+        borderColor: COLORS[sym],
+        borderWidth: 2,
+        pointRadius: 2,
+        pointBackgroundColor: COLORS[sym],
+        tension: 0.2,
+        backgroundColor: 'transparent',
+        yAxisID: (sym === 'TSLA' || sym === 'VOO') ? 'y2' : 'y'
+      });
+    });
+
+    new Chart(document.getElementById('chartOC'), {
+      type: 'line',
+      data: { labels: OC_DATES, datasets: ocDatasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...TT,
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y}`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { color: GRID }, ticks: { color: TICK } },
+          y: {
+            position: 'left',
+            grid: { color: GRID },
+            ticks: { color: TICK, callback: v => `$${v}` },
+            title: { display: true, text: 'NVDA · AAPL · GOOGL', color: TICK, font: { size: 10 } }
+          },
+          y2: {
+            position: 'right',
+            grid: { display: false },
+            ticks: { color: TICK, callback: v => `$${v}` },
+            title: { display: true, text: 'TSLA · VOO', color: TICK, font: { size: 10 } }
           }
         }
       }

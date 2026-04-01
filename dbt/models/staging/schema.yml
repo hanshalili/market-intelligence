@@ -16,11 +16,11 @@ sources:
             tests:
               - not_null
           - name: symbol
-            description: "Ticker symbol: AAPL, TSLA, or SPY."
+            description: "Ticker symbol: NVDA, AAPL, GOOGL, TSLA, or VOO."
             tests:
               - not_null
               - accepted_values:
-                  values: ["AAPL", "TSLA", "SPY"]
+                  values: ["NVDA", "AAPL", "GOOGL", "TSLA", "VOO"]
           - name: adjusted_close
             description: "Dividend and split adjusted closing price."
             tests:

@@ -1,5 +1,5 @@
 /*
-  mart_daily_metrics.sql — Analytics mart: financial metrics for AAPL, TSLA, SPY
+  mart_daily_metrics.sql — Analytics mart: financial metrics for NVDA, AAPL, GOOGL, TSLA, VOO
 
   Source:  stg_stock_prices (staging view)
   Purpose: Compute all financial metrics used in the Plotly dashboard.
@@ -28,8 +28,8 @@
     drawdown               — % below the trailing 52-week high (downside risk)
 
   Relative performance
-    spy_daily_return     — SPY's daily return on the same date (benchmark)
-    excess_return_vs_spy — Stock return minus SPY return (alpha proxy)
+    voo_daily_return     — VOO's daily return on the same date (benchmark)
+    excess_return_vs_voo — Stock return minus VOO return (alpha proxy)
   ─────────────────────────────────────────────────────────────────────────
 */
 
@@ -40,6 +40,7 @@ prices AS (
     SELECT
         date,
         symbol,
+        open,
         adjusted_close,
         volume
     FROM {{ ref('stg_stock_prices') }}
@@ -50,6 +51,7 @@ returns AS (
     SELECT
         date,
         symbol,
+        open,
         adjusted_close,
         volume,
 
@@ -127,6 +129,7 @@ volatility AS (
     SELECT
         date,
         symbol,
+        open,
         adjusted_close,
         volume,
         daily_return,
@@ -162,20 +165,21 @@ volatility AS (
     FROM returns
 ),
 
--- Step 4: Extract SPY returns to join as benchmark
-spy_returns AS (
+-- Step 4: Extract VOO returns to join as benchmark
+voo_returns AS (
     SELECT
         date,
-        daily_return AS spy_daily_return
+        daily_return AS voo_daily_return
     FROM volatility
-    WHERE symbol = 'SPY'
+    WHERE symbol = 'VOO'
 ),
 
--- Step 5: Join SPY benchmark onto all symbols and compute excess return
+-- Step 5: Join VOO benchmark onto all symbols and compute excess return
 final AS (
     SELECT
         v.date,
         v.symbol,
+        v.open,
         v.adjusted_close,
         v.volume,
         v.daily_return,
@@ -185,15 +189,14 @@ final AS (
         v.sma_200,
         v.rolling_volatility_20d,
         v.drawdown,
-        spy.spy_daily_return,
-        -- Excess return = stock return minus market return (simple alpha)
-        ROUND(v.daily_return - spy.spy_daily_return, 6) AS excess_return_vs_spy,
+        voo.voo_daily_return,
+        -- Excess return = stock return minus benchmark return (simple alpha)
+        ROUND(v.daily_return - voo.voo_daily_return, 6) AS excess_return_vs_voo,
         CURRENT_TIMESTAMP()                              AS transformed_at
     FROM volatility AS v
-    LEFT JOIN spy_returns AS spy
-        ON v.date = spy.date
-    -- SPY is included as a row; its excess_return_vs_spy will be 0.0 by definition
-    -- (SPY return minus SPY return = 0), which is correct and intentional.
+    LEFT JOIN voo_returns AS voo
+        ON v.date = voo.date
+    -- VOO is included as a row; its excess_return_vs_voo will be 0.0 by definition.
 )
 
 SELECT * FROM final
