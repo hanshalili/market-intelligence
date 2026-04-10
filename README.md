@@ -1,154 +1,179 @@
-# Market Intelligence
+# MarketIntel
 
-A production-grade daily market data pipeline and dashboard. Ingests OHLCV price data for **NVDA, AAPL, GOOGL, TSLA, and VOO** from Alpha Vantage, stores and transforms it in Google Cloud, and serves a minimal futuristic web dashboard built from live BigQuery data.
+**A production-grade daily market data pipeline and dashboard — Alpha Vantage → GCS → BigQuery → dbt → Chart.js.**
 
----
-
-## Why This Exists
-
-Most market dashboards are either expensive SaaS tools or one-off scripts that break. This project is a fully orchestrated, idempotent batch pipeline — built with the same tools used in production data engineering — that runs automatically every weekday after NYSE close and keeps the dashboard fresh without manual intervention.
-
----
-
-## Features
-
-- **Daily ingestion** — Airflow DAG triggers at 21:00 UTC (Mon–Fri), 30 min after NYSE close
-- **5 tickers** — NVDA, AAPL, GOOGL, TSLA, VOO (100 trading days of OHLCV history)
-- **Full ELT stack** — Alpha Vantage → GCS (raw JSON + Parquet) → BigQuery → dbt mart
-- **Financial metrics** — daily return, cumulative return, SMA-20/50/200, 20-day annualised volatility, drawdown, excess return vs VOO benchmark
-- **Live dashboard** — generated from BigQuery; shows close price, cumulative return %, open vs close, and a KPI strip per ticker
-- **Infrastructure as code** — GCS bucket, BigQuery dataset, IAM, and service accounts managed by Terraform
-- **Data quality** — dbt tests enforce not-null, uniqueness, positive prices, and non-positive drawdown
-- **Idempotent** — every pipeline step is safe to re-run; partitioned BigQuery loads use `WRITE_TRUNCATE`
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
+![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-2.8-017CEE?style=flat-square&logo=apache-airflow&logoColor=white)
+![dbt](https://img.shields.io/badge/dbt-1.x-FF694B?style=flat-square&logo=dbt&logoColor=white)
+![BigQuery](https://img.shields.io/badge/BigQuery-GCP-4285F4?style=flat-square&logo=google-cloud&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-1.5+-623CE4?style=flat-square&logo=terraform&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 ---
 
-## Tech Stack
+## What It Does
 
-| Layer | Tools |
-|---|---|
-| Orchestration | Apache Airflow 2.8 (Docker Compose) |
-| Extraction | Python · Alpha Vantage API |
-| Storage | Google Cloud Storage (raw JSON + Parquet) |
-| Warehouse | BigQuery (partitioned by date, clustered by symbol) |
-| Transformation | dbt (staging view + analytics mart) |
-| Infrastructure | Terraform |
-| Dashboard | Chart.js · Vanilla HTML/CSS |
-| Containerisation | Docker |
-
----
-
-## Architecture
+MarketIntel ingests daily OHLCV price data for **NVDA, AAPL, GOOGL, TSLA, and VOO** from the Alpha Vantage API, stores raw and curated files in Google Cloud Storage, loads them into a partitioned BigQuery warehouse, and runs dbt transformations to compute financial metrics. A static dashboard generated from live BigQuery data visualises close prices, cumulative returns, and open/close comparisons — no server required.
 
 ```
 Alpha Vantage API
       │  TIME_SERIES_DAILY (5 symbols × 100 days)
       ▼
-  extract.py  ──►  GCS raw/  (JSON, partitioned by symbol/date)
+  extract.py  ──►  GCS  raw/       (JSON, partitioned by symbol/date)
       │
-  transform.py ──►  GCS curated/  (Parquet, Snappy)
+  transform.py ──►  GCS  curated/  (Parquet, Snappy-compressed)
       │
   load.py  ──►  BigQuery: market_analytics.raw_stock_prices
                           (partitioned by date, clustered by symbol)
       │
-  dbt run  ──►  stg_stock_prices  (VIEW — cast, dedupe, validate)
+  dbt run  ──►  stg_stock_prices      (VIEW — cast, dedupe, validate)
+             ──►  mart_daily_metrics   (TABLE — returns, SMAs,
+                                        volatility, drawdown, VOO benchmark)
       │
-             ──►  mart_daily_metrics  (TABLE — returns, SMAs,
-                                       volatility, drawdown, VOO benchmark)
-      │
-  scripts/  ──►  dashboard/index.html  (static, Chart.js, real BQ data)
+  scripts/  ──►  dashboard/index.html  (static, Chart.js, BQ data embedded)
 ```
 
-![Architecture](architecture.png)
+Airflow DAG `daily_market_pipeline` — 8 tasks, scheduled Mon–Fri at **21:00 UTC** (30 min after NYSE close).
 
-Airflow DAG: `daily_market_pipeline` — 8 tasks, runs Mon–Fri at 21:00 UTC.
+---
+
+## Why This Architecture
+
+Most market dashboards are expensive SaaS tools or one-off scripts that break. MarketIntel is a fully orchestrated, idempotent ELT pipeline built with the same toolchain used in production data engineering — demonstrating end-to-end ownership from raw API ingestion to a queryable analytics mart and a rendered dashboard.
+
+Key decisions:
+- **GCS as a landing zone** — raw JSON is preserved before any transformation; Parquet in `curated/` decouples ingestion from loading
+- **BigQuery partitioned by date, clustered by symbol** — query cost scales with date range, not full table scans
+- **dbt staging → mart pattern** — staging view casts and deduplicates; mart materialises financial metrics once per day
+- **Static dashboard** — no runtime server needed; BigQuery data is embedded at generation time, making it trivially hostable anywhere
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Version | Purpose |
+|---|---|---|---|
+| Orchestration | Apache Airflow | 2.8 | Scheduled DAG, retries, task dependencies |
+| Extraction | Python + Alpha Vantage API | 3.11 | Daily OHLCV ingestion |
+| Storage | Google Cloud Storage | — | Raw JSON + Parquet landing zone |
+| Warehouse | BigQuery | — | Partitioned, clustered OHLCV store |
+| Transformation | dbt | 1.x | Staging view + analytics mart |
+| Infrastructure | Terraform | ≥ 1.5 | GCS, BigQuery, IAM, service accounts |
+| Dashboard | Chart.js + HTML/CSS | — | Static, browser-only market charts |
+| Containerisation | Docker Compose | — | Airflow webserver + scheduler |
+
+---
+
+## dbt Metrics — `mart_daily_metrics`
+
+| Column | Type | Description |
+|---|---|---|
+| `symbol` | STRING | Ticker (NVDA, AAPL, etc.) |
+| `date` | DATE | Trading date |
+| `open` | FLOAT | Opening price |
+| `adjusted_close` | FLOAT | Split-adjusted closing price |
+| `daily_return` | FLOAT | % change vs prior trading day |
+| `cumulative_return` | FLOAT | % gain from first row per symbol |
+| `sma_20 / sma_50 / sma_200` | FLOAT | Simple moving averages |
+| `rolling_volatility_20d` | FLOAT | Annualised StdDev of returns (20-day window) |
+| `drawdown` | FLOAT | % below trailing 52-week high (always ≤ 0) |
+| `voo_daily_return` | FLOAT | VOO benchmark return on same date |
+| `excess_return_vs_voo` | FLOAT | Alpha proxy vs VOO benchmark |
 
 ---
 
 ## Project Structure
 
 ```
-market-intelligence/
+market-intel/
 ├── airflow/
-│   ├── dags/daily_market_pipeline.py   # Airflow DAG (8 tasks)
+│   ├── dags/daily_market_pipeline.py   # 8-task Airflow DAG, Mon–Fri 21:00 UTC
 │   ├── src/
-│   │   ├── config.py                   # Centralised config (env vars)
-│   │   ├── extract.py                  # Alpha Vantage client
-│   │   ├── transform.py                # JSON → Parquet, GCS upload
-│   │   └── load.py                     # Parquet → BigQuery
+│   │   ├── config.py                   # Centralised config (env vars only)
+│   │   ├── extract.py                  # Alpha Vantage client → GCS raw/
+│   │   ├── transform.py                # JSON → Parquet, upload to GCS curated/
+│   │   └── load.py                     # Parquet → BigQuery (WRITE_TRUNCATE)
 │   ├── docker-compose.yml
 │   └── requirements.txt
 ├── dbt/
 │   ├── models/
-│   │   ├── staging/stg_stock_prices.sql
-│   │   └── marts/mart_daily_metrics.sql
-│   └── tests/generic/                  # Custom dbt tests
+│   │   ├── staging/stg_stock_prices.sql   # Cast, dedupe, validate
+│   │   └── marts/mart_daily_metrics.sql   # Returns, SMAs, volatility, drawdown
+│   └── tests/generic/                     # Custom dbt data quality tests
 ├── dashboard/
-│   └── index.html                      # Static dashboard (BigQuery data embedded)
+│   └── index.html                         # Static Chart.js dashboard (BQ data embedded)
 ├── scripts/
-│   ├── build_dashboard_data.py         # Query BQ → dashboard/data.json
-│   └── generate_index.py              # data.json → index.html
-├── terraform/                          # GCS, BigQuery, IAM
-├── tests/                              # Airflow DAG unit tests
-└── Makefile                            # All commands
+│   ├── build_dashboard_data.py            # Query BigQuery → dashboard/data.json
+│   └── generate_index.py                  # data.json → index.html
+├── terraform/                             # GCS bucket, BigQuery dataset, IAM
+├── tests/                                 # Airflow DAG unit tests
+└── Makefile                               # All commands
 ```
 
 ---
 
-## Setup
+## Quickstart
 
 ### Prerequisites
 
-- Docker Desktop (running)
-- Terraform ≥ 1.5
-- GCP project with billing enabled
-- Alpha Vantage API key ([free tier](https://www.alphavantage.co/): 25 req/day)
+| Tool | Version | Notes |
+|---|---|---|
+| Docker Desktop | latest | Must be running |
+| Terraform | ≥ 1.5 | `brew install terraform` |
+| GCP project | — | Billing must be enabled |
+| Alpha Vantage API key | — | Free tier: 25 req/day |
 
-### 1. Clone and configure
+### Credentials
 
+| Variable | Where to get it | Example |
+|---|---|---|
+| `ALPHA_VANTAGE_API_KEY` | [alphavantage.co](https://www.alphavantage.co/) | `ABC123XYZ` |
+| `GCP_PROJECT_ID` | GCP Console → Project selector | `my-project-123` |
+| `GCS_BUCKET_NAME` | After `make tf-apply` | `marketintel-raw-abc123` |
+| `BIGQUERY_DATASET` | After `make tf-apply` | `market_analytics` |
+| Service account JSON | After `make tf-apply` | `airflow/credentials/service_account.json` |
+
+### Steps
+
+**1. Clone and configure**
 ```bash
-git clone https://github.com/hanshalili/market-intelligence.git
-cd market-intelligence
+git clone https://github.com/hanshalili/MarketIntel.git
+cd market-intel
 cp .env.example .env
-# Edit .env — fill in: ALPHA_VANTAGE_API_KEY, GCP_PROJECT_ID, GCS_BUCKET_NAME
+# Edit .env — fill in API key, GCP project, bucket name
 ```
 
-### 2. Provision GCP infrastructure
-
+**2. Provision GCP infrastructure**
 ```bash
 make tf-init
 make tf-apply
-# Creates: GCS bucket, BigQuery dataset, service account + JSON key
+# Creates: GCS bucket, BigQuery dataset, service account + downloads JSON key
 ```
+Place the downloaded key at `airflow/credentials/service_account.json`.
 
-Place the downloaded service account JSON at `airflow/credentials/service_account.json`.
-
-### 3. Start Airflow
-
+**3. Start Airflow**
 ```bash
-make airflow-init   # one-time DB setup
-make airflow-up     # starts webserver + scheduler
+make airflow-init   # One-time DB setup
+make airflow-up     # Starts webserver + scheduler
 # UI → http://localhost:8080  (admin / admin)
 ```
 
-### 4. Run the pipeline
-
+**4. Trigger the pipeline**
 ```bash
 make pipeline-trigger
-# Monitor at http://localhost:8080
+# Monitor run at http://localhost:8080
 ```
 
-### 5. Refresh the dashboard
-
+**5. Generate the dashboard**
 ```bash
-python3 scripts/build_dashboard_data.py   # query BigQuery → data.json
+python3 scripts/build_dashboard_data.py   # BigQuery → dashboard/data.json
 python3 scripts/generate_index.py         # data.json → dashboard/index.html
 open dashboard/index.html
 ```
 
 ---
 
-## Usage
+## Commands
 
 | Command | Description |
 |---|---|
@@ -158,43 +183,34 @@ open dashboard/index.html
 | `make pipeline-status` | Show recent DAG run states |
 | `make dbt-run` | Run dbt models inside the scheduler container |
 | `make dbt-test` | Run dbt data quality tests |
+| `make tf-init` | Initialise Terraform |
 | `make tf-apply` | Provision / update GCP infrastructure |
 
 ---
 
 ## Dashboard
 
-The dashboard (`dashboard/index.html`) is a self-contained static page powered by Chart.js with data embedded directly from BigQuery. No server required — open in any browser.
+`dashboard/index.html` is a self-contained static page powered by Chart.js — open it in any browser, no server required.
 
-**Three charts:**
-1. **Adjusted Close Price** — 100-day daily close per ticker (dual y-axis)
-2. **Cumulative Return %** — normalised from first trading day
-3. **Open vs Close** — dashed = open, solid = close, full history
+**Charts:**
+1. **Adjusted Close Price** — 100-day daily close per ticker (dual y-axis for scale differences)
+2. **Cumulative Return %** — normalised from first trading day per symbol
+3. **Open vs Close** — dashed = open, solid = close, full 100-day history
 
-**KPI strip** — per ticker: latest open, close, cumulative return, annualised volatility, drawdown.
-
----
-
-## dbt Metrics (`mart_daily_metrics`)
-
-| Column | Description |
-|---|---|
-| `open` | Opening price |
-| `adjusted_close` | Closing price (split-adjusted) |
-| `daily_return` | % change vs prior trading day |
-| `cumulative_return` | % gain from first row per symbol |
-| `sma_20 / sma_50 / sma_200` | Simple moving averages |
-| `rolling_volatility_20d` | Annualised StdDev of returns (20-day window) |
-| `drawdown` | % below trailing 52-week high (always ≤ 0) |
-| `voo_daily_return` | VOO benchmark return on same date |
-| `excess_return_vs_voo` | Alpha proxy vs VOO |
+**KPI strip** — per ticker: latest open, close, cumulative return %, annualised volatility, drawdown.
 
 ---
 
-## Resume-Ready Bullets
+## Resume Bullets
 
-- Built an end-to-end daily market data pipeline (Alpha Vantage → GCS → BigQuery → dbt) orchestrated with Apache Airflow on Docker, processing 500 rows/day across 5 tickers
-- Designed a partitioned, clustered BigQuery schema and dbt analytics mart computing financial metrics (SMAs, volatility, drawdown, excess return vs benchmark)
-- Provisioned GCP infrastructure (GCS, BigQuery, IAM, service accounts) with Terraform; all secrets managed via environment variables with zero hardcoded credentials
-- Built a static market intelligence dashboard (Chart.js) generated from live BigQuery data, displaying close prices, cumulative returns, and open/close comparison across NVDA, AAPL, GOOGL, TSLA, and VOO
-- Implemented idempotent pipeline steps using `WRITE_TRUNCATE` date partitioning, dbt deduplication, and Airflow retry logic with exponential backoff
+- Built an end-to-end daily market data pipeline (Alpha Vantage → GCS → BigQuery → dbt) orchestrated with Apache Airflow on Docker Compose, processing 500 rows/day across 5 tickers with full idempotency via `WRITE_TRUNCATE` partitioning
+- Designed a partitioned (by date), clustered (by symbol) BigQuery schema and dbt analytics mart computing SMA-20/50/200, 20-day annualised volatility, drawdown, and excess return vs VOO benchmark
+- Provisioned GCP infrastructure (GCS, BigQuery, IAM, service accounts) with Terraform following least-privilege principles; all secrets managed via environment variables with zero hardcoded credentials
+- Built a static market intelligence dashboard (Chart.js) generated from live BigQuery data, displaying close prices, cumulative returns, and open/close comparisons across NVDA, AAPL, GOOGL, TSLA, and VOO
+- Implemented idempotent pipeline steps using `WRITE_TRUNCATE` date partitioning, dbt deduplication logic, and Airflow retry with exponential backoff
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE)
